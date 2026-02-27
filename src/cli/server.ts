@@ -32,12 +32,15 @@ function jsonResponse(data: unknown, status = 200): Response {
 /** Resolve the directory where built web assets live. */
 function getWebDistDir(): string {
   // When running from dist/cli/index.js, web assets are at dist/web/
+  // Check for index.html to distinguish built output from source directory
   const fromDist = resolve(import.meta.dir, "../web");
-  if (existsSync(fromDist)) return fromDist;
+  if (existsSync(join(fromDist, "index.html")) && existsSync(join(fromDist, "assets"))) {
+    return fromDist;
+  }
 
-  // When running from source during development, try the built output
+  // When running from source (src/cli/index.ts), built output is at dist/web/
   const fromRoot = resolve(import.meta.dir, "../../dist/web");
-  if (existsSync(fromRoot)) return fromRoot;
+  if (existsSync(join(fromRoot, "index.html"))) return fromRoot;
 
   return fromDist; // Fallback
 }
