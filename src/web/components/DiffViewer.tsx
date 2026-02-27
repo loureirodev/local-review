@@ -130,6 +130,7 @@ export default function DiffViewer({
         }}
         lineAnnotations={lineAnnotations}
         renderAnnotation={renderAnnotation}
+        renderHoverUtility={renderHoverUtility}
       />
 
       {/* Active comment input overlay */}
