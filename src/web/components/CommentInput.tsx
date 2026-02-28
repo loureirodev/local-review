@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
 import type { ReviewComment } from "@shared/types.js";
+import { useCallback, useState } from "react";
 
 interface CommentInputProps {
   filePath: string;
@@ -42,28 +42,29 @@ export default function CommentInput({
         onCancel();
       }
     },
-    [handleSubmit, onCancel]
+    [handleSubmit, onCancel],
   );
 
   return (
-    <div className="p-2 bg-neutral-900 border border-neutral-700 rounded m-1">
+    <div className="p-2 bg-neutral-900 border border-neutral-700/50 rounded m-1">
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Write a comment... (Ctrl+Enter to submit)"
         rows={3}
-        autoFocus
         className="w-full px-2 py-1.5 text-sm bg-neutral-800 border border-neutral-700 rounded resize-none focus:outline-none focus:border-blue-500 text-neutral-200 placeholder-neutral-500"
       />
       <div className="flex justify-end gap-2 mt-1.5">
         <button
+          type="button"
           onClick={onCancel}
           className="px-2.5 py-1 text-xs text-neutral-400 hover:text-neutral-200 rounded transition-colors"
         >
           Cancel
         </button>
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!body.trim()}
           className="px-2.5 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-700 disabled:text-neutral-500 text-white rounded transition-colors"

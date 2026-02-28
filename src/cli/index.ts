@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 // CLI entry point for local-review
 
+import type { DiffMode } from "../shared/types.js";
 import { isGitRepo } from "./git.js";
 import { openBrowser } from "./open-browser.js";
 import { startServer } from "./server.js";
-import type { DiffMode } from "../shared/types.js";
 
 function printHelp(): void {
-  console.error(`
+  console.error(
+    `
 local-review - Lightweight web-based git diff review tool
 
 Usage: local-review [options] [<git-diff-args>...]
@@ -26,7 +27,8 @@ Examples:
   local-review --mode staged         # Review staged changes
   local-review --mode branch         # Review all branch changes vs base
   local-review -- --stat             # Pass extra args to git diff
-`.trim());
+`.trim(),
+  );
 }
 
 function printVersion(): void {
@@ -44,7 +46,7 @@ function parseArgs(argv: string[]): {
   shouldExit: boolean;
 } {
   const result = {
-    port: 0, // 0 = random available port
+    port: 0, // 0 = random available port (overridden in dev mode)
     noOpen: false,
     outputFile: "./review.xml",
     mode: "unstaged" as DiffMode,
@@ -72,7 +74,7 @@ function parseArgs(argv: string[]): {
 
       case "--port":
         result.port = parseInt(argv[++i], 10);
-        if (isNaN(result.port)) {
+        if (Number.isNaN(result.port)) {
           console.error("Error: --port requires a valid number");
           process.exit(1);
         }
@@ -93,15 +95,14 @@ function parseArgs(argv: string[]): {
       case "--mode":
         result.mode = argv[++i] as DiffMode;
         if (!["unstaged", "staged", "branch"].includes(result.mode)) {
-          console.error(
-            "Error: --mode must be one of: unstaged, staged, branch"
-          );
+          console.error("Error: --mode must be one of: unstaged, staged, branch");
           process.exit(1);
         }
         break;
 
       case "--dev":
         result.devMode = true;
+        if (result.port === 0) result.port = 3000;
         break;
 
       case "--":

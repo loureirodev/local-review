@@ -1,14 +1,9 @@
 // Bun HTTP server: serves the frontend and exposes the API
 
-import { join, resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { DiffMode, DiffResponse, ReviewState } from "../shared/types.js";
-import {
-  getGitDiff,
-  getCurrentBranch,
-  getBaseBranch,
-  getRepoRoot,
-} from "./git.js";
+import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git.js";
 import { serializeReview } from "./xml-serializer.js";
 
 interface ServerOptions {
@@ -48,7 +43,7 @@ function getWebDistDir(): string {
 async function handleApiRequest(
   req: Request,
   pathname: string,
-  opts: ServerOptions
+  opts: ServerOptions,
 ): Promise<Response> {
   // GET /api/diff — return the raw patch + metadata
   if (pathname === "/api/diff" && req.method === "GET") {
@@ -67,10 +62,7 @@ async function handleApiRequest(
       };
       return jsonResponse(response);
     } catch (err) {
-      return jsonResponse(
-        { error: err instanceof Error ? err.message : "Unknown error" },
-        500
-      );
+      return jsonResponse({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
     }
   }
 
@@ -99,7 +91,7 @@ async function handleApiRequest(
     } catch (err) {
       return jsonResponse(
         { error: err instanceof Error ? err.message : "Failed to save review" },
-        500
+        500,
       );
     }
   }

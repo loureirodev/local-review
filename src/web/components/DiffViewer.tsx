@@ -1,13 +1,18 @@
-import { useCallback, useMemo, useState } from "react";
-import { PatchDiff } from "@pierre/diffs/react";
+import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffLineAnnotation } from "@pierre/diffs/react";
+import { FileDiff } from "@pierre/diffs/react";
 import type { ReviewComment } from "@shared/types.js";
-import CommentInput from "./CommentInput.js";
+import { useCallback, useMemo, useState } from "react";
 import CommentDisplay from "./CommentDisplay.js";
+import CommentInput from "./CommentInput.js";
 
 interface DiffViewerProps {
   patch: string;
   diffStyle: "split" | "unified";
+  wrapLines: boolean;
+  showLineNumbers: boolean;
+  fontSize: number;
+  lineHeight: number;
   selectedFile: string | null;
   comments: ReviewComment[];
   onAddComment: (comment: ReviewComment) => void;
@@ -27,12 +32,32 @@ interface ActiveInput {
 export default function DiffViewer({
   patch,
   diffStyle,
+  wrapLines,
+  showLineNumbers,
+  fontSize,
+  lineHeight,
   selectedFile,
   comments,
   onAddComment,
   onDeleteComment,
 }: DiffViewerProps) {
   const [activeInput, setActiveInput] = useState<ActiveInput | null>(null);
+
+  const fileDiff = useMemo(() => {
+    if (!patch) return null;
+
+    try {
+      const parsed = parsePatchFiles(patch);
+      const allFiles = parsed.flatMap((parsedPatch) => parsedPatch.files);
+
+      if (allFiles.length === 0) return null;
+      if (!selectedFile) return allFiles[0] ?? null;
+
+      return allFiles.find((file) => file.name === selectedFile) ?? null;
+    } catch {
+      return null;
+    }
+  }, [patch, selectedFile]);
 
   // Build line annotations from comments for @pierre/diffs
   const lineAnnotations = useMemo(() => {
@@ -54,7 +79,7 @@ export default function DiffViewer({
       onAddComment(comment);
       setActiveInput(null);
     },
-    [onAddComment]
+    [onAddComment],
   );
 
   const renderAnnotation = useCallback(
@@ -72,21 +97,22 @@ export default function DiffViewer({
         </div>
       );
     },
-    [onDeleteComment]
+    [onDeleteComment],
   );
 
   // Render the hover utility for adding comments
   const renderHoverUtility = useCallback(
     (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
-      const hovered = getHoveredLine();
-      if (!hovered) return null;
-
       // Determine file path from patch context
-      const filePath = selectedFile ?? "";
+      const filePath = selectedFile ?? fileDiff?.name ?? "";
 
       return (
         <button
+          type="button"
           onClick={() => {
+            const hovered = getHoveredLine();
+            if (!hovered) return;
+
             setActiveInput({
               filePath,
               line: hovered.lineNumber,
@@ -102,10 +128,10 @@ export default function DiffViewer({
         </button>
       );
     },
-    [selectedFile]
+    [selectedFile, fileDiff],
   );
 
-  if (!patch) {
+  if (!patch || !fileDiff) {
     return (
       <div className="flex items-center justify-center h-full text-neutral-500">
         <div className="text-center">
@@ -118,15 +144,18 @@ export default function DiffViewer({
 
   return (
     <div className="h-full overflow-auto">
-      <PatchDiff
-        patch={patch}
+      <FileDiff
+        fileDiff={fileDiff}
         options={{
           diffStyle,
           theme: { dark: "github-dark", light: "github-light" },
           themeType: "dark",
           lineDiffType: "word",
-          overflow: "scroll",
+          overflow: wrapLines ? "wrap" : "scroll",
+          disableLineNumbers: !showLineNumbers,
           expandUnchanged: true,
+          enableHoverUtility: true,
+          unsafeCSS: `:host { --diffs-font-size: ${fontSize}px; --diffs-line-height: ${lineHeight}px; }`,
         }}
         lineAnnotations={lineAnnotations}
         renderAnnotation={renderAnnotation}

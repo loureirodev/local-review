@@ -25,9 +25,7 @@ export async function changeDiffMode(mode: DiffMode): Promise<void> {
   }
 }
 
-export async function submitReview(
-  state: ReviewState
-): Promise<{ path: string }> {
+export async function submitReview(state: ReviewState): Promise<{ path: string }> {
   const res = await fetch(`${BASE}/api/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

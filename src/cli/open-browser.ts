@@ -1,6 +1,6 @@
 // Cross-platform browser opener (WSL2, macOS, Linux)
 
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 
 /** Detect if running inside WSL2. */
 function isWSL(): boolean {

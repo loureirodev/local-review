@@ -5,22 +5,21 @@ interface CommentDisplayProps {
   onDelete: (commentId: string) => void;
 }
 
-export default function CommentDisplay({
-  comment,
-  onDelete,
-}: CommentDisplayProps) {
+export default function CommentDisplay({ comment, onDelete }: CommentDisplayProps) {
   return (
-    <div className="p-2 bg-neutral-900 border border-neutral-700 rounded m-1">
+    <div className="p-2 bg-neutral-900 border border-neutral-700/50 rounded m-1">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm text-neutral-200 whitespace-pre-wrap break-words flex-1">
           {comment.body}
         </p>
         <button
+          type="button"
           onClick={() => onDelete(comment.id)}
           className="flex-shrink-0 p-0.5 text-neutral-500 hover:text-red-400 transition-colors"
           title="Delete comment"
         >
           <svg
+            aria-hidden="true"
             className="w-3.5 h-3.5"
             viewBox="0 0 24 24"
             fill="none"

@@ -1,17 +1,18 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
 import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffMode, DiffResponse, ReviewState } from "@shared/types.js";
-import { ReviewProvider, useReview } from "./context/ReviewContext.js";
-import { fetchDiff, changeDiffMode, submitReview } from "./hooks/useApi.js";
-import Layout from "./components/Layout.js";
-import FileTree, { type FileInfo } from "./components/FileTree.js";
-import Toolbar from "./components/Toolbar.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DiffViewer from "./components/DiffViewer.js";
+import FileTree, { type FileInfo } from "./components/FileTree.js";
+import Layout from "./components/Layout.js";
+import Toolbar from "./components/Toolbar.js";
+import { ReviewProvider, useReview } from "./context/ReviewContext.js";
+import { changeDiffMode, fetchDiff, submitReview } from "./hooks/useApi.js";
+import { useSettings } from "./hooks/useSettings.js";
 
 function AppContent() {
   const [patch, setPatch] = useState("");
   const [mode, setMode] = useState<DiffMode>("unstaged");
-  const [diffStyle, setDiffStyle] = useState<"split" | "unified">("split");
+  const { settings, update } = useSettings();
   const [branch, setBranch] = useState("");
   const [baseBranch, setBaseBranch] = useState("");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -19,8 +20,7 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const { state, dispatch, addComment, deleteComment, toggleViewed } =
-    useReview();
+  const { state, dispatch, addComment, deleteComment, toggleViewed } = useReview();
 
   // Extract file names from the patch
   const files: FileInfo[] = useMemo(() => {
@@ -30,9 +30,12 @@ function AppContent() {
       const allFiles = parsed.flatMap((p) => p.files);
       return allFiles.map((f) => ({
         name: f.name,
-        type: f.type === "rename-pure" || f.type === "rename-changed"
-          ? f.type === "rename-pure" ? "renamed" as const : "renamed-changed" as const
-          : f.type as FileInfo["type"],
+        type:
+          f.type === "rename-pure" || f.type === "rename-changed"
+            ? f.type === "rename-pure"
+              ? ("renamed" as const)
+              : ("renamed-changed" as const)
+            : (f.type as FileInfo["type"]),
       }));
     } catch {
       return [];
@@ -87,7 +90,7 @@ function AppContent() {
         setError(err instanceof Error ? err.message : "Failed to change mode");
       }
     },
-    [loadDiff]
+    [loadDiff],
   );
 
   // Handle export
@@ -133,6 +136,7 @@ function AppContent() {
           <p className="text-red-400 text-lg">Error</p>
           <p className="text-neutral-400 text-sm mt-2">{error}</p>
           <button
+            type="button"
             onClick={loadDiff}
             className="mt-4 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
           >
@@ -148,11 +152,21 @@ function AppContent() {
       toolbar={
         <Toolbar
           mode={mode}
-          diffStyle={diffStyle}
+          diffStyle={settings.diffStyle}
           branch={branch}
           baseBranch={baseBranch}
+          wrapLines={settings.wrapLines}
+          showLineNumbers={settings.showLineNumbers}
+          nestedTree={settings.nestedTree}
+          fontSize={settings.fontSize}
+          lineHeight={settings.lineHeight}
           onModeChange={handleModeChange}
-          onDiffStyleChange={setDiffStyle}
+          onDiffStyleChange={(v) => update("diffStyle", v)}
+          onWrapLinesChange={(v) => update("wrapLines", v)}
+          onShowLineNumbersChange={(v) => update("showLineNumbers", v)}
+          onNestedTreeChange={(v) => update("nestedTree", v)}
+          onFontSizeChange={(v) => update("fontSize", v)}
+          onLineHeightChange={(v) => update("lineHeight", v)}
           onExportReview={handleExportReview}
           exporting={exporting}
         />
@@ -162,6 +176,7 @@ function AppContent() {
           files={files}
           reviewFiles={state.files}
           selectedFile={selectedFile}
+          nested={settings.nestedTree}
           onSelectFile={setSelectedFile}
           onToggleViewed={toggleViewed}
         />
@@ -169,7 +184,11 @@ function AppContent() {
     >
       <DiffViewer
         patch={patch}
-        diffStyle={diffStyle}
+        diffStyle={settings.diffStyle}
+        wrapLines={settings.wrapLines}
+        showLineNumbers={settings.showLineNumbers}
+        fontSize={settings.fontSize}
+        lineHeight={settings.lineHeight}
         selectedFile={selectedFile}
         comments={selectedFileComments}
         onAddComment={addComment}

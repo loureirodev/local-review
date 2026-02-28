@@ -3,10 +3,7 @@
 import type { DiffMode } from "../shared/types.js";
 
 /** Run a shell command and return its stdout. */
-async function run(
-  cmd: string[],
-  cwd?: string
-): Promise<string> {
+async function run(cmd: string[], cwd?: string): Promise<string> {
   const proc = Bun.spawn(cmd, {
     cwd,
     stdout: "pipe",
@@ -61,7 +58,7 @@ export async function getBaseBranch(cwd?: string): Promise<string> {
   try {
     const remoteHead = await run(
       ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "--short"],
-      cwd
+      cwd,
     );
     return remoteHead.replace("origin/", "");
   } catch {
@@ -73,7 +70,7 @@ export async function getBaseBranch(cwd?: string): Promise<string> {
 export async function getGitDiff(
   mode: DiffMode,
   extraArgs: string[] = [],
-  cwd?: string
+  cwd?: string,
 ): Promise<string> {
   const args = ["git", "diff"];
 

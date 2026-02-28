@@ -1,16 +1,12 @@
+import type { DiffSource, FileReviewState, ReviewComment } from "@shared/types.js";
 import {
   createContext,
+  type Dispatch,
+  type ReactNode,
+  useCallback,
   useContext,
   useReducer,
-  useCallback,
-  type ReactNode,
-  type Dispatch,
 } from "react";
-import type {
-  ReviewComment,
-  FileReviewState,
-  DiffSource,
-} from "@shared/types.js";
 
 // ===== State =====
 
@@ -39,10 +35,7 @@ type ReviewAction =
       body: string;
     };
 
-function reviewReducer(
-  state: ReviewStateLocal,
-  action: ReviewAction
-): ReviewStateLocal {
+function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewStateLocal {
   switch (action.type) {
     case "SET_SOURCE":
       return { ...state, source: action.source };
@@ -111,7 +104,7 @@ function reviewReducer(
           [action.filePath]: {
             ...file,
             comments: file.comments.map((c) =>
-              c.id === action.commentId ? { ...c, body: action.body } : c
+              c.id === action.commentId ? { ...c, body: action.body } : c,
             ),
           },
         },
@@ -139,33 +132,21 @@ const ReviewContext = createContext<ReviewContextValue | null>(null);
 export function ReviewProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reviewReducer, initialState);
 
-  const addComment = useCallback(
-    (comment: ReviewComment) => {
-      dispatch({ type: "ADD_COMMENT", comment });
-    },
-    [dispatch]
-  );
+  const addComment = useCallback((comment: ReviewComment) => {
+    dispatch({ type: "ADD_COMMENT", comment });
+  }, []);
 
-  const deleteComment = useCallback(
-    (filePath: string, commentId: string) => {
-      dispatch({ type: "DELETE_COMMENT", filePath, commentId });
-    },
-    [dispatch]
-  );
+  const deleteComment = useCallback((filePath: string, commentId: string) => {
+    dispatch({ type: "DELETE_COMMENT", filePath, commentId });
+  }, []);
 
-  const updateComment = useCallback(
-    (filePath: string, commentId: string, body: string) => {
-      dispatch({ type: "UPDATE_COMMENT", filePath, commentId, body });
-    },
-    [dispatch]
-  );
+  const updateComment = useCallback((filePath: string, commentId: string, body: string) => {
+    dispatch({ type: "UPDATE_COMMENT", filePath, commentId, body });
+  }, []);
 
-  const toggleViewed = useCallback(
-    (filePath: string) => {
-      dispatch({ type: "TOGGLE_VIEWED", filePath });
-    },
-    [dispatch]
-  );
+  const toggleViewed = useCallback((filePath: string) => {
+    dispatch({ type: "TOGGLE_VIEWED", filePath });
+  }, []);
 
   return (
     <ReviewContext.Provider
