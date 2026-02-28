@@ -1,12 +1,5 @@
 import type { DiffSource, FileReviewState, ReviewComment } from "@shared/types.js";
-import {
-  createContext,
-  type Dispatch,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useReducer,
-} from "react";
+import { createContext, type Dispatch, type ReactNode, use, useCallback, useReducer } from "react";
 
 // ===== State =====
 
@@ -165,7 +158,7 @@ export function ReviewProvider({ children }: { children: ReactNode }) {
 }
 
 export function useReview(): ReviewContextValue {
-  const ctx = useContext(ReviewContext);
+  const ctx = use(ReviewContext);
   if (!ctx) {
     throw new Error("useReview must be used within a ReviewProvider");
   }

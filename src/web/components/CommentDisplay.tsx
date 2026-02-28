@@ -1,11 +1,12 @@
 import type { ReviewComment } from "@shared/types.js";
+import { memo } from "react";
 
 interface CommentDisplayProps {
   comment: ReviewComment;
   onDelete: (commentId: string) => void;
 }
 
-export default function CommentDisplay({ comment, onDelete }: CommentDisplayProps) {
+const CommentDisplay = memo(function CommentDisplay({ comment, onDelete }: CommentDisplayProps) {
   return (
     <div className="p-2 bg-neutral-900 border border-neutral-700/50 rounded m-1">
       <div className="flex items-start justify-between gap-2">
@@ -31,15 +32,17 @@ export default function CommentDisplay({ comment, onDelete }: CommentDisplayProp
         </button>
       </div>
       <div className="mt-1 text-xs text-neutral-500">
-        {comment.line !== null && (
+        {comment.line !== null ? (
           <span>
             Line {comment.line}
             {comment.side && ` (${comment.side})`}
             {" \u00b7 "}
           </span>
-        )}
+        ) : null}
         {new Date(comment.createdAt).toLocaleTimeString()}
       </div>
     </div>
   );
-}
+});
+
+export default CommentDisplay;

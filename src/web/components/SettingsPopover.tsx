@@ -1,4 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  LINE_HEIGHT_MAX,
+  LINE_HEIGHT_MIN,
+} from "../hooks/useSettings.js";
+import {
+  FontSizeIcon,
+  GearIcon,
+  LineNumbersIcon,
+  LineSpacingIcon,
+  SplitIcon,
+  TreeIcon,
+  UnifiedIcon,
+  WrapIcon,
+} from "./icons.js";
 
 interface SettingsPopoverProps {
   diffStyle: "split" | "unified";
@@ -13,131 +29,6 @@ interface SettingsPopoverProps {
   onNestedTreeChange: (nested: boolean) => void;
   onFontSizeChange: (size: number) => void;
   onLineHeightChange: (height: number) => void;
-}
-
-/* ── Inline SVG Icons ── */
-
-function GearIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M6.5 1.5h3l.4 1.8.6.3 1.7-.7 2.1 2.1-.7 1.7.3.6 1.8.4v3l-1.8.4-.3.6.7 1.7-2.1 2.1-1.7-.7-.6.3-.4 1.8h-3l-.4-1.8-.6-.3-1.7.7-2.1-2.1.7-1.7-.3-.6-1.8-.4v-3l1.8-.4.3-.6-.7-1.7 2.1-2.1 1.7.7.6-.3z" />
-      <circle cx="8" cy="8" r="2.5" />
-    </svg>
-  );
-}
-
-function SplitIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke={active ? "currentColor" : "currentColor"}
-      strokeWidth="1.3"
-      strokeLinecap="round"
-    >
-      <rect x="1.5" y="2.5" width="5" height="11" rx="1" />
-      <rect x="9.5" y="2.5" width="5" height="11" rx="1" />
-    </svg>
-  );
-}
-
-function UnifiedIcon({ active }: { active: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke={active ? "currentColor" : "currentColor"}
-      strokeWidth="1.3"
-      strokeLinecap="round"
-    >
-      <rect x="2.5" y="2.5" width="11" height="11" rx="1" />
-      <line x1="4.5" y1="5.5" x2="11.5" y2="5.5" />
-      <line x1="4.5" y1="8" x2="11.5" y2="8" />
-      <line x1="4.5" y1="10.5" x2="11.5" y2="10.5" />
-    </svg>
-  );
-}
-
-function WrapIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 4h10M3 8h8a2.5 2.5 0 0 1 0 5H9" />
-      <polyline points="10,11 9,13 8,11" />
-    </svg>
-  );
-}
-
-function LineNumbersIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-    >
-      <text x="2" y="5.5" fontSize="4" fill="currentColor" stroke="none" fontFamily="monospace">
-        1
-      </text>
-      <line x1="7" y1="4" x2="14" y2="4" />
-      <text x="2" y="9.5" fontSize="4" fill="currentColor" stroke="none" fontFamily="monospace">
-        2
-      </text>
-      <line x1="7" y1="8" x2="14" y2="8" />
-      <text x="2" y="13.5" fontSize="4" fill="currentColor" stroke="none" fontFamily="monospace">
-        3
-      </text>
-      <line x1="7" y1="12" x2="14" y2="12" />
-    </svg>
-  );
-}
-
-function TreeIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 2v12M3 5h3M3 9h3M6 9v3h3" />
-    </svg>
-  );
 }
 
 /* ── Toggle Row ── */
@@ -167,8 +58,6 @@ function ToggleRow({
     </button>
   );
 }
-
-/* ── Main Popover ── */
 
 /* ── Stepper Row ── */
 
@@ -221,46 +110,7 @@ function StepperRow({
   );
 }
 
-function FontSizeIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 12V4h2.5a2 2 0 0 1 0 4H3M3 8h2.5" />
-      <path d="M9 12V6l4 6V6" />
-    </svg>
-  );
-}
-
-function LineSpacingIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="6" y1="4" x2="14" y2="4" />
-      <line x1="6" y1="8" x2="14" y2="8" />
-      <line x1="6" y1="12" x2="14" y2="12" />
-      <path d="M3 2l-1.5 2h3zM3 14l-1.5-2h3z" fill="currentColor" stroke="none" />
-      <line x1="3" y1="4" x2="3" y2="12" />
-    </svg>
-  );
-}
+/* ── Main Popover ── */
 
 export default function SettingsPopover({
   diffStyle,
@@ -311,7 +161,7 @@ export default function SettingsPopover({
       </button>
 
       {/* Popover */}
-      {open && (
+      {open ? (
         <div className="absolute top-full right-0 mt-1.5 w-56 bg-neutral-900 border border-neutral-700/80 rounded-lg shadow-2xl shadow-black/40 z-50 overflow-hidden">
           {/* Header */}
           <div className="px-2.5 py-1.5 border-b border-neutral-800 text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
@@ -332,7 +182,7 @@ export default function SettingsPopover({
                       : "text-neutral-400 hover:text-neutral-300"
                   }`}
                 >
-                  <SplitIcon active={diffStyle === "split"} />
+                  <SplitIcon />
                   Split
                 </button>
                 <button
@@ -344,7 +194,7 @@ export default function SettingsPopover({
                       : "text-neutral-400 hover:text-neutral-300"
                   }`}
                 >
-                  <UnifiedIcon active={diffStyle === "unified"} />
+                  <UnifiedIcon />
                   Unified
                 </button>
               </div>
@@ -373,8 +223,8 @@ export default function SettingsPopover({
               icon={<FontSizeIcon />}
               label="Font size"
               value={fontSize}
-              min={10}
-              max={20}
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
               step={1}
               unit="px"
               onChange={onFontSizeChange}
@@ -383,8 +233,8 @@ export default function SettingsPopover({
               icon={<LineSpacingIcon />}
               label="Line height"
               value={lineHeight}
-              min={14}
-              max={32}
+              min={LINE_HEIGHT_MIN}
+              max={LINE_HEIGHT_MAX}
               step={2}
               unit="px"
               onChange={onLineHeightChange}
@@ -400,7 +250,7 @@ export default function SettingsPopover({
             />
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,23 +1,13 @@
 import type { DiffMode } from "@shared/types.js";
+import { useSettings } from "../hooks/useSettings.js";
+import { BranchIcon, ExportIcon } from "./icons.js";
 import SettingsPopover from "./SettingsPopover.js";
 
 interface ToolbarProps {
   mode: DiffMode;
-  diffStyle: "split" | "unified";
   branch: string;
   baseBranch: string;
-  wrapLines: boolean;
-  showLineNumbers: boolean;
-  nestedTree: boolean;
-  fontSize: number;
-  lineHeight: number;
   onModeChange: (mode: DiffMode) => void;
-  onDiffStyleChange: (style: "split" | "unified") => void;
-  onWrapLinesChange: (wrap: boolean) => void;
-  onShowLineNumbersChange: (show: boolean) => void;
-  onNestedTreeChange: (nested: boolean) => void;
-  onFontSizeChange: (size: number) => void;
-  onLineHeightChange: (height: number) => void;
   onExportReview: () => void;
   exporting: boolean;
 }
@@ -28,77 +18,28 @@ const modeLabels: Record<DiffMode, string> = {
   branch: "Branch",
 };
 
-function BranchIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="5" cy="4" r="2" />
-      <circle cx="5" cy="12" r="2" />
-      <circle cx="12" cy="6" r="2" />
-      <path d="M5 6v4M10 6c-2 0-5 0-5 4" />
-    </svg>
-  );
-}
-
-function ExportIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 13h8M8 3v7M5 6l3-3 3 3" />
-    </svg>
-  );
-}
-
 export default function Toolbar({
   mode,
-  diffStyle,
   branch,
   baseBranch,
-  wrapLines,
-  showLineNumbers,
-  nestedTree,
-  fontSize,
-  lineHeight,
   onModeChange,
-  onDiffStyleChange,
-  onWrapLinesChange,
-  onShowLineNumbersChange,
-  onNestedTreeChange,
-  onFontSizeChange,
-  onLineHeightChange,
   onExportReview,
   exporting,
 }: ToolbarProps) {
+  const { state: settings, actions } = useSettings();
+
   return (
     <header className="flex items-center gap-3 px-3 py-1.5 bg-neutral-900/95 border-b border-neutral-800/80 flex-shrink-0 backdrop-blur-sm">
       {/* Branch info */}
       <div className="flex items-center gap-1.5 text-xs text-neutral-400">
         <BranchIcon />
         <span className="font-mono font-medium text-neutral-200">{branch}</span>
-        {mode === "branch" && (
+        {mode === "branch" ? (
           <span className="text-neutral-600">
             {"→ "}
             <span className="font-mono text-neutral-400">{baseBranch}</span>
           </span>
-        )}
+        ) : null}
       </div>
 
       <div className="h-3.5 w-px bg-neutral-700/60" />
@@ -125,18 +66,18 @@ export default function Toolbar({
 
       {/* Settings popover */}
       <SettingsPopover
-        diffStyle={diffStyle}
-        wrapLines={wrapLines}
-        showLineNumbers={showLineNumbers}
-        nestedTree={nestedTree}
-        fontSize={fontSize}
-        lineHeight={lineHeight}
-        onDiffStyleChange={onDiffStyleChange}
-        onWrapLinesChange={onWrapLinesChange}
-        onShowLineNumbersChange={onShowLineNumbersChange}
-        onNestedTreeChange={onNestedTreeChange}
-        onFontSizeChange={onFontSizeChange}
-        onLineHeightChange={onLineHeightChange}
+        diffStyle={settings.diffStyle}
+        wrapLines={settings.wrapLines}
+        showLineNumbers={settings.showLineNumbers}
+        nestedTree={settings.nestedTree}
+        fontSize={settings.fontSize}
+        lineHeight={settings.lineHeight}
+        onDiffStyleChange={(v) => actions.update("diffStyle", v)}
+        onWrapLinesChange={(v) => actions.update("wrapLines", v)}
+        onShowLineNumbersChange={(v) => actions.update("showLineNumbers", v)}
+        onNestedTreeChange={(v) => actions.update("nestedTree", v)}
+        onFontSizeChange={(v) => actions.update("fontSize", v)}
+        onLineHeightChange={(v) => actions.update("lineHeight", v)}
       />
 
       {/* Spacer */}

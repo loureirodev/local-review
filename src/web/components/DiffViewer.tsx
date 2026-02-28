@@ -3,16 +3,12 @@ import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import { FileDiff } from "@pierre/diffs/react";
 import type { ReviewComment } from "@shared/types.js";
 import { useCallback, useMemo, useState } from "react";
+import { useSettings } from "../hooks/useSettings.js";
 import CommentDisplay from "./CommentDisplay.js";
 import CommentInput from "./CommentInput.js";
 
 interface DiffViewerProps {
   patch: string;
-  diffStyle: "split" | "unified";
-  wrapLines: boolean;
-  showLineNumbers: boolean;
-  fontSize: number;
-  lineHeight: number;
   selectedFile: string | null;
   comments: ReviewComment[];
   onAddComment: (comment: ReviewComment) => void;
@@ -31,16 +27,14 @@ interface ActiveInput {
 
 export default function DiffViewer({
   patch,
-  diffStyle,
-  wrapLines,
-  showLineNumbers,
-  fontSize,
-  lineHeight,
   selectedFile,
   comments,
   onAddComment,
   onDeleteComment,
 }: DiffViewerProps) {
+  const {
+    state: { diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight },
+  } = useSettings();
   const [activeInput, setActiveInput] = useState<ActiveInput | null>(null);
 
   const fileDiff = useMemo(() => {

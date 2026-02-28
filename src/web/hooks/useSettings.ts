@@ -1,6 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  use,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
-const STORAGE_KEY = "local-review-settings";
+const STORAGE_KEY = "local-review-settings:v1";
+
+export const FONT_SIZE_MIN = 10;
+export const FONT_SIZE_MAX = 20;
+export const LINE_HEIGHT_MIN = 14;
+export const LINE_HEIGHT_MAX = 32;
 
 export interface DisplaySettings {
   diffStyle: "split" | "unified";
@@ -20,32 +33,32 @@ const defaults: DisplaySettings = {
   lineHeight: 20,
 };
 
-function load(): DisplaySettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...defaults };
-    const parsed = JSON.parse(raw);
-    return { ...defaults, ...parsed };
-  } catch {
-    return { ...defaults };
-  }
+interface SettingsContextValue {
+  state: DisplaySettings;
+  actions: {
+    update: <K extends keyof DisplaySettings>(key: K, value: DisplaySettings[K]) => void;
+  };
 }
 
-function save(settings: DisplaySettings) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // localStorage unavailable — silently ignore
-  }
-}
+const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-export function useSettings() {
-  const [settings, setSettingsState] = useState<DisplaySettings>(load);
+export function SettingsProvider({ children }: { children: ReactNode }) {
+  const [state, setSettingsState] = useState<DisplaySettings>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? { ...defaults, ...JSON.parse(stored) } : { ...defaults };
+    } catch {
+      return { ...defaults };
+    }
+  });
 
-  // Persist on every change
   useEffect(() => {
-    save(settings);
-  }, [settings]);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // localStorage unavailable — silently ignore
+    }
+  }, [state]);
 
   const update = useCallback(
     <K extends keyof DisplaySettings>(key: K, value: DisplaySettings[K]) => {
@@ -54,5 +67,17 @@ export function useSettings() {
     [],
   );
 
-  return { settings, update } as const;
+  return createElement(
+    SettingsContext.Provider,
+    { value: { state, actions: { update } } },
+    children,
+  );
+}
+
+export function useSettings(): SettingsContextValue {
+  const ctx = use(SettingsContext);
+  if (!ctx) {
+    throw new Error("useSettings must be used within a SettingsProvider");
+  }
+  return ctx;
 }

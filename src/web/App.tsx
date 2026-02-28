@@ -2,19 +2,28 @@ import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffMode, DiffResponse, ReviewState } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DiffViewer from "./components/DiffViewer.js";
+import ErrorBoundary from "./components/ErrorBoundary.js";
 import FileTree, { type FileInfo } from "./components/FileTree.js";
 import Layout from "./components/Layout.js";
 import Toolbar from "./components/Toolbar.js";
 import { ReviewProvider, useReview } from "./context/ReviewContext.js";
-import { changeDiffMode, fetchDiff, submitReview } from "./hooks/useApi.js";
-import { useSettings } from "./hooks/useSettings.js";
+import { changeDiffMode, fetchDiff, submitReview } from "./hooks/api.js";
+import { SettingsProvider } from "./hooks/useSettings.js";
+
+interface DiffState {
+  patch: string;
+  mode: DiffMode;
+  branch: string;
+  baseBranch: string;
+}
 
 function AppContent() {
-  const [patch, setPatch] = useState("");
-  const [mode, setMode] = useState<DiffMode>("unstaged");
-  const { settings, update } = useSettings();
-  const [branch, setBranch] = useState("");
-  const [baseBranch, setBaseBranch] = useState("");
+  const [diffState, setDiffState] = useState<DiffState>({
+    patch: "",
+    mode: "unstaged",
+    branch: "",
+    baseBranch: "",
+  });
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,9 +33,9 @@ function AppContent() {
 
   // Extract file names from the patch
   const files: FileInfo[] = useMemo(() => {
-    if (!patch) return [];
+    if (!diffState.patch) return [];
     try {
-      const parsed = parsePatchFiles(patch);
+      const parsed = parsePatchFiles(diffState.patch);
       const allFiles = parsed.flatMap((p) => p.files);
       return allFiles.map((f) => ({
         name: f.name,
@@ -40,7 +49,7 @@ function AppContent() {
     } catch {
       return [];
     }
-  }, [patch]);
+  }, [diffState.patch]);
 
   // Load diff data
   const loadDiff = useCallback(async () => {
@@ -48,10 +57,12 @@ function AppContent() {
     setError(null);
     try {
       const data: DiffResponse = await fetchDiff();
-      setPatch(data.patch);
-      setMode(data.source.type === "local" ? data.source.mode : "unstaged");
-      setBranch(data.info.branch);
-      setBaseBranch(data.info.baseBranch);
+      setDiffState({
+        patch: data.patch,
+        mode: data.source.type === "local" ? data.source.mode : "unstaged",
+        branch: data.info.branch,
+        baseBranch: data.info.baseBranch,
+      });
       dispatch({ type: "SET_SOURCE", source: data.source });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load diff");
@@ -84,7 +95,7 @@ function AppContent() {
     async (newMode: DiffMode) => {
       try {
         await changeDiffMode(newMode);
-        setMode(newMode);
+        setDiffState((prev) => ({ ...prev, mode: newMode }));
         await loadDiff();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to change mode");
@@ -99,7 +110,7 @@ function AppContent() {
     try {
       const reviewState: ReviewState = {
         timestamp: new Date().toISOString(),
-        source: state.source ?? { type: "local", mode },
+        source: state.source ?? { type: "local", mode: diffState.mode },
         files: Object.values(state.files),
       };
       const result = await submitReview(reviewState);
@@ -110,7 +121,7 @@ function AppContent() {
     } finally {
       setExporting(false);
     }
-  }, [state, mode]);
+  }, [state, diffState.mode]);
 
   // Get comments for the selected file
   const selectedFileComments = useMemo(() => {
@@ -151,22 +162,10 @@ function AppContent() {
     <Layout
       toolbar={
         <Toolbar
-          mode={mode}
-          diffStyle={settings.diffStyle}
-          branch={branch}
-          baseBranch={baseBranch}
-          wrapLines={settings.wrapLines}
-          showLineNumbers={settings.showLineNumbers}
-          nestedTree={settings.nestedTree}
-          fontSize={settings.fontSize}
-          lineHeight={settings.lineHeight}
+          mode={diffState.mode}
+          branch={diffState.branch}
+          baseBranch={diffState.baseBranch}
           onModeChange={handleModeChange}
-          onDiffStyleChange={(v) => update("diffStyle", v)}
-          onWrapLinesChange={(v) => update("wrapLines", v)}
-          onShowLineNumbersChange={(v) => update("showLineNumbers", v)}
-          onNestedTreeChange={(v) => update("nestedTree", v)}
-          onFontSizeChange={(v) => update("fontSize", v)}
-          onLineHeightChange={(v) => update("lineHeight", v)}
           onExportReview={handleExportReview}
           exporting={exporting}
         />
@@ -176,24 +175,20 @@ function AppContent() {
           files={files}
           reviewFiles={state.files}
           selectedFile={selectedFile}
-          nested={settings.nestedTree}
           onSelectFile={setSelectedFile}
           onToggleViewed={toggleViewed}
         />
       }
     >
-      <DiffViewer
-        patch={patch}
-        diffStyle={settings.diffStyle}
-        wrapLines={settings.wrapLines}
-        showLineNumbers={settings.showLineNumbers}
-        fontSize={settings.fontSize}
-        lineHeight={settings.lineHeight}
-        selectedFile={selectedFile}
-        comments={selectedFileComments}
-        onAddComment={addComment}
-        onDeleteComment={deleteComment}
-      />
+      <ErrorBoundary>
+        <DiffViewer
+          patch={diffState.patch}
+          selectedFile={selectedFile}
+          comments={selectedFileComments}
+          onAddComment={addComment}
+          onDeleteComment={deleteComment}
+        />
+      </ErrorBoundary>
     </Layout>
   );
 }
@@ -201,7 +196,9 @@ function AppContent() {
 export default function App() {
   return (
     <ReviewProvider>
-      <AppContent />
+      <SettingsProvider>
+        <AppContent />
+      </SettingsProvider>
     </ReviewProvider>
   );
 }

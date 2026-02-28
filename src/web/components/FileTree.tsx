@@ -1,11 +1,12 @@
 import type { FileReviewState } from "@shared/types.js";
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useSettings } from "../hooks/useSettings.js";
+import { ChevronIcon, FolderIcon } from "./icons.js";
 
 interface FileTreeProps {
   files: FileInfo[];
   reviewFiles: Record<string, FileReviewState>;
   selectedFile: string | null;
-  nested: boolean;
   onSelectFile: (filePath: string) => void;
   onToggleViewed: (filePath: string) => void;
 }
@@ -30,54 +31,6 @@ const typeLabels: Record<FileInfo["type"], string> = {
   "renamed-changed": "R",
   change: "M",
 };
-
-/* ── SVG Icons ── */
-
-function ChevronIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
-    >
-      <path d="M4 2l4 4-4 4" />
-    </svg>
-  );
-}
-
-function FolderIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={open ? "text-blue-400/80" : "text-neutral-500"}
-    >
-      {open ? (
-        <path d="M2 4v8a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3.5A1 1 0 005.8 3H3a1 1 0 00-1 1z" />
-      ) : (
-        <path
-          d="M2 4v8a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3.5A1 1 0 005.8 3H3a1 1 0 00-1 1z"
-          fill="currentColor"
-          fillOpacity="0.15"
-        />
-      )}
-    </svg>
-  );
-}
 
 /* ── Tree node types ── */
 
@@ -135,7 +88,7 @@ function buildTree(files: FileInfo[]): TreeNode[] {
 
 /* ── File Row (shared between flat and nested) ── */
 
-function FileRow({
+const FileRow = memo(function FileRow({
   file,
   displayName,
   isSelected,
@@ -199,18 +152,18 @@ function FileRow({
       </span>
 
       {/* Comment count */}
-      {commentCount > 0 && (
+      {commentCount > 0 ? (
         <span className="ml-auto flex-shrink-0 text-[10px] bg-blue-600/80 text-white rounded-full px-1.5 py-px font-medium">
           {commentCount}
         </span>
-      )}
+      ) : null}
     </button>
   );
-}
+});
 
 /* ── Nested Tree Node ── */
 
-function TreeNodeRow({
+const TreeNodeRow = memo(function TreeNodeRow({
   node,
   depth,
   expandedDirs,
@@ -264,23 +217,24 @@ function TreeNodeRow({
         <FolderIcon open={isExpanded} />
         <span className="truncate font-mono text-neutral-400">{node.name}</span>
       </button>
-      {isExpanded &&
-        node.children.map((child) => (
-          <TreeNodeRow
-            key={child.fullPath}
-            node={child}
-            depth={depth + 1}
-            expandedDirs={expandedDirs}
-            toggleDir={toggleDir}
-            selectedFile={selectedFile}
-            reviewFiles={reviewFiles}
-            onSelectFile={onSelectFile}
-            onToggleViewed={onToggleViewed}
-          />
-        ))}
+      {isExpanded
+        ? node.children.map((child) => (
+            <TreeNodeRow
+              key={child.fullPath}
+              node={child}
+              depth={depth + 1}
+              expandedDirs={expandedDirs}
+              toggleDir={toggleDir}
+              selectedFile={selectedFile}
+              reviewFiles={reviewFiles}
+              onSelectFile={onSelectFile}
+              onToggleViewed={onToggleViewed}
+            />
+          ))
+        : null}
     </>
   );
-}
+});
 
 /* ── Main Component ── */
 
@@ -288,10 +242,12 @@ export default function FileTree({
   files,
   reviewFiles,
   selectedFile,
-  nested,
   onSelectFile,
   onToggleViewed,
 }: FileTreeProps) {
+  const {
+    state: { nestedTree: nested },
+  } = useSettings();
   const [filter, setFilter] = useState("");
 
   // Expanded dirs state — all expanded by default
@@ -309,7 +265,7 @@ export default function FileTree({
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set(allDirPaths));
 
   // Sync expanded dirs when files change
-  useMemo(() => {
+  useEffect(() => {
     setExpandedDirs((prev) => {
       const merged = new Set(prev);
       for (const d of allDirPaths) merged.add(d);
