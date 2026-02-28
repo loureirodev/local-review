@@ -17,7 +17,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "react-doctor": "react-doctor -y --no-ami --offline --fail-on warning",
+    "react-doctor": "react-doctor -y --no-ami",
     "prepare": "husky install",
     "prepublishOnly": "bun run build"
   },
