@@ -128,20 +128,24 @@ export default function SettingsPopover({
 }: SettingsPopoverProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
 
-  // Close on outside click
+  // Close on outside click — listener registered once, openRef read at event time
   const handleOutsideClick = useCallback((e: MouseEvent) => {
-    if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+    if (
+      openRef.current &&
+      containerRef.current &&
+      !containerRef.current.contains(e.target as Node)
+    ) {
       setOpen(false);
     }
   }, []);
 
   useEffect(() => {
-    if (open) {
-      document.addEventListener("mousedown", handleOutsideClick);
-      return () => document.removeEventListener("mousedown", handleOutsideClick);
-    }
-  }, [open, handleOutsideClick]);
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [handleOutsideClick]);
 
   return (
     <div className="relative" ref={containerRef}>

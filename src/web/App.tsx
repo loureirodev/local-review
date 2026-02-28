@@ -1,6 +1,6 @@
 import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffMode, DiffResponse, ReviewState } from "@shared/types.js";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import DiffViewer from "./components/DiffViewer.js";
 import ErrorBoundary from "./components/ErrorBoundary.js";
 import FileTree, { type FileInfo } from "./components/FileTree.js";
@@ -17,6 +17,34 @@ interface DiffState {
   baseBranch: string;
 }
 
+interface AsyncState {
+  loading: boolean;
+  error: string | null;
+  exporting: boolean;
+}
+
+type AsyncAction =
+  | { type: "LOAD_START" }
+  | { type: "LOAD_SUCCESS" }
+  | { type: "LOAD_ERROR"; error: string }
+  | { type: "EXPORT_START" }
+  | { type: "EXPORT_END" };
+
+function asyncReducer(state: AsyncState, action: AsyncAction): AsyncState {
+  switch (action.type) {
+    case "LOAD_START":
+      return { ...state, loading: true, error: null };
+    case "LOAD_SUCCESS":
+      return { ...state, loading: false };
+    case "LOAD_ERROR":
+      return { ...state, loading: false, error: action.error };
+    case "EXPORT_START":
+      return { ...state, exporting: true };
+    case "EXPORT_END":
+      return { ...state, exporting: false };
+  }
+}
+
 function AppContent() {
   const [diffState, setDiffState] = useState<DiffState>({
     patch: "",
@@ -25,9 +53,11 @@ function AppContent() {
     baseBranch: "",
   });
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [async, dispatchAsync] = useReducer(asyncReducer, {
+    loading: true,
+    error: null,
+    exporting: false,
+  });
 
   const { state, dispatch, addComment, deleteComment, toggleViewed } = useReview();
 
@@ -53,8 +83,7 @@ function AppContent() {
 
   // Load diff data
   const loadDiff = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    dispatchAsync({ type: "LOAD_START" });
     try {
       const data: DiffResponse = await fetchDiff();
       setDiffState({
@@ -64,10 +93,12 @@ function AppContent() {
         baseBranch: data.info.baseBranch,
       });
       dispatch({ type: "SET_SOURCE", source: data.source });
+      dispatchAsync({ type: "LOAD_SUCCESS" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load diff");
-    } finally {
-      setLoading(false);
+      dispatchAsync({
+        type: "LOAD_ERROR",
+        error: err instanceof Error ? err.message : "Failed to load diff",
+      });
     }
   }, [dispatch]);
 
@@ -98,7 +129,10 @@ function AppContent() {
         setDiffState((prev) => ({ ...prev, mode: newMode }));
         await loadDiff();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to change mode");
+        dispatchAsync({
+          type: "LOAD_ERROR",
+          error: err instanceof Error ? err.message : "Failed to change mode",
+        });
       }
     },
     [loadDiff],
@@ -106,7 +140,7 @@ function AppContent() {
 
   // Handle export
   const handleExportReview = useCallback(async () => {
-    setExporting(true);
+    dispatchAsync({ type: "EXPORT_START" });
     try {
       const reviewState: ReviewState = {
         timestamp: new Date().toISOString(),
@@ -114,12 +148,14 @@ function AppContent() {
         files: Object.values(state.files),
       };
       const result = await submitReview(reviewState);
-      // Brief success indication
       alert(`Review exported to: ${result.path}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export review");
+      dispatchAsync({
+        type: "LOAD_ERROR",
+        error: err instanceof Error ? err.message : "Failed to export review",
+      });
     } finally {
-      setExporting(false);
+      dispatchAsync({ type: "EXPORT_END" });
     }
   }, [state, diffState.mode]);
 
@@ -129,7 +165,7 @@ function AppContent() {
     return state.files[selectedFile]?.comments ?? [];
   }, [selectedFile, state.files]);
 
-  if (loading) {
+  if (async.loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-neutral-950">
         <div className="flex flex-col items-center gap-3">
@@ -140,12 +176,12 @@ function AppContent() {
     );
   }
 
-  if (error) {
+  if (async.error) {
     return (
       <div className="flex items-center justify-center h-screen bg-neutral-950">
         <div className="text-center max-w-md">
           <p className="text-red-400 text-lg">Error</p>
-          <p className="text-neutral-400 text-sm mt-2">{error}</p>
+          <p className="text-neutral-400 text-sm mt-2">{async.error}</p>
           <button
             type="button"
             onClick={loadDiff}
@@ -167,7 +203,7 @@ function AppContent() {
           baseBranch={diffState.baseBranch}
           onModeChange={handleModeChange}
           onExportReview={handleExportReview}
-          exporting={exporting}
+          exporting={async.exporting}
         />
       }
       sidebar={

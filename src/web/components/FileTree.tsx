@@ -95,7 +95,7 @@ const FileRow = memo(function FileRow({
   isViewed,
   commentCount,
   depth,
-  onSelect,
+  onSelectFile,
   onToggleViewed,
 }: {
   file: FileInfo;
@@ -104,28 +104,45 @@ const FileRow = memo(function FileRow({
   isViewed: boolean;
   commentCount: number;
   depth: number;
-  onSelect: () => void;
-  onToggleViewed: (e: React.MouseEvent) => void;
+  onSelectFile: (path: string) => void;
+  onToggleViewed: (path: string) => void;
 }) {
+  const handleViewedClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleViewed(file.name);
+  };
+
+  const handleViewedKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleViewed(file.name);
+    }
+  };
+
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={() => onSelectFile(file.name)}
       className={`w-full text-left py-1 pr-2 text-[13px] flex items-center gap-1.5 hover:bg-neutral-800/70 transition-colors ${
         isSelected ? "bg-neutral-800 text-neutral-100" : ""
       }`}
       style={{ paddingLeft: `${8 + depth * 16}px` }}
     >
-      {/* Viewed checkbox */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: checkbox inside button, click handled by parent */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard access via outer button */}
+      {/* Viewed checkbox — span[role=checkbox] because <input type="checkbox"> cannot be nested inside <button> */}
+      {/* biome-ignore lint/a11y/useSemanticElements: interactive checkbox nested inside button requires span */}
       <span
-        onClick={onToggleViewed}
+        role="checkbox"
+        aria-checked={isViewed}
+        aria-label="Mark as viewed"
+        tabIndex={-1}
+        onClick={handleViewedClick}
+        onKeyDown={handleViewedKeyDown}
         className={`flex-shrink-0 w-3.5 h-3.5 border rounded-[3px] flex items-center justify-center cursor-pointer transition-colors ${
           isViewed ? "bg-blue-600 border-blue-600" : "border-neutral-600 hover:border-neutral-400"
         }`}
       >
-        {isViewed && (
+        {isViewed ? (
           <svg
             aria-hidden="true"
             className="w-2.5 h-2.5 text-white"
@@ -136,7 +153,7 @@ const FileRow = memo(function FileRow({
           >
             <path d="M2 6l3 3 5-5" />
           </svg>
-        )}
+        ) : null}
       </span>
 
       {/* Change type badge */}
@@ -194,11 +211,8 @@ const TreeNodeRow = memo(function TreeNodeRow({
         isViewed={isViewed}
         commentCount={commentCount}
         depth={depth}
-        onSelect={() => onSelectFile(file.name)}
-        onToggleViewed={(e) => {
-          e.stopPropagation();
-          onToggleViewed(file.name);
-        }}
+        onSelectFile={onSelectFile}
+        onToggleViewed={onToggleViewed}
       />
     );
   }
@@ -292,17 +306,7 @@ export default function FileTree({
     return nested ? buildTree(filteredFiles) : [];
   }, [nested, filteredFiles]);
 
-  const viewedCount = useMemo(() => {
-    return Object.values(reviewFiles).filter((f) => f.viewed).length;
-  }, [reviewFiles]);
-
-  const handleCheckboxClick = useCallback(
-    (e: React.MouseEvent, filePath: string) => {
-      e.stopPropagation();
-      onToggleViewed(filePath);
-    },
-    [onToggleViewed],
-  );
+  const viewedCount = Object.values(reviewFiles).filter((f) => f.viewed).length;
 
   return (
     <div className="flex flex-col h-full">
@@ -346,8 +350,8 @@ export default function FileTree({
                   isViewed={isViewed}
                   commentCount={commentCount}
                   depth={0}
-                  onSelect={() => onSelectFile(file.name)}
-                  onToggleViewed={(e) => handleCheckboxClick(e, file.name)}
+                  onSelectFile={onSelectFile}
+                  onToggleViewed={onToggleViewed}
                 />
               );
             })}
