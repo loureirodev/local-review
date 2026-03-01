@@ -53,6 +53,7 @@ function AppContent() {
     baseBranch: "",
   });
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [navigationTargetFile, setNavigationTargetFile] = useState<string | null>(null);
   const [async, dispatchAsync] = useReducer(asyncReducer, {
     loading: true,
     error: null,
@@ -159,11 +160,18 @@ function AppContent() {
     }
   }, [state, diffState.mode]);
 
-  // Get comments for the selected file
-  const selectedFileComments = useMemo(() => {
-    if (!selectedFile) return [];
-    return state.files[selectedFile]?.comments ?? [];
-  }, [selectedFile, state.files]);
+  const handleSelectFile = useCallback((filePath: string) => {
+    setSelectedFile(filePath);
+    setNavigationTargetFile(filePath);
+  }, []);
+
+  const handleActiveFileChange = useCallback((filePath: string) => {
+    setSelectedFile((current) => (current === filePath ? current : filePath));
+  }, []);
+
+  const handleNavigationHandled = useCallback((filePath: string) => {
+    setNavigationTargetFile((current) => (current === filePath ? null : current));
+  }, []);
 
   if (async.loading) {
     return (
@@ -211,7 +219,7 @@ function AppContent() {
           files={files}
           reviewFiles={state.files}
           selectedFile={selectedFile}
-          onSelectFile={setSelectedFile}
+          onSelectFile={handleSelectFile}
           onToggleViewed={toggleViewed}
         />
       }
@@ -220,7 +228,10 @@ function AppContent() {
         <DiffViewer
           patch={diffState.patch}
           selectedFile={selectedFile}
-          comments={selectedFileComments}
+          navigationTargetFile={navigationTargetFile}
+          reviewFiles={state.files}
+          onNavigationHandled={handleNavigationHandled}
+          onActiveFileChange={handleActiveFileChange}
           onAddComment={addComment}
           onDeleteComment={deleteComment}
         />

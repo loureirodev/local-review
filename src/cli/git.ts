@@ -3,7 +3,7 @@
 import type { DiffMode } from "../shared/types.js";
 
 /** Run a shell command and return its stdout. */
-async function run(cmd: string[], cwd?: string): Promise<string> {
+async function run(cmd: string[], cwd?: string, allowedExitCodes: number[] = [0]): Promise<string> {
   const proc = Bun.spawn(cmd, {
     cwd,
     stdout: "pipe",
@@ -11,11 +11,24 @@ async function run(cmd: string[], cwd?: string): Promise<string> {
   });
   const stdout = await new Response(proc.stdout).text();
   const exitCode = await proc.exited;
-  if (exitCode !== 0) {
+  if (!allowedExitCodes.includes(exitCode)) {
     const stderr = await new Response(proc.stderr).text();
     throw new Error(`Command failed: ${cmd.join(" ")}\n${stderr}`);
   }
   return stdout.trim();
+}
+
+async function getUntrackedPatch(cwd?: string): Promise<string> {
+  const output = await run(["git", "ls-files", "--others", "--exclude-standard"], cwd);
+  if (!output) return "";
+
+  const files = output.split("\n").filter(Boolean);
+  const patches = await Promise.all(
+    files.map((filePath) =>
+      run(["git", "diff", "--no-index", "--", "/dev/null", filePath], cwd, [0, 1]),
+    ),
+  );
+  return patches.filter(Boolean).join("\n");
 }
 
 /** Check if we're inside a git repository. */
@@ -91,6 +104,14 @@ export async function getGitDiff(
   args.push(...extraArgs);
 
   try {
+    if (mode === "unstaged") {
+      const [trackedPatch, untrackedPatch] = await Promise.all([
+        run(args, cwd),
+        getUntrackedPatch(cwd),
+      ]);
+      return [trackedPatch, untrackedPatch].filter(Boolean).join("\n");
+    }
+
     return await run(args, cwd);
   } catch (err) {
     // If branch mode fails (e.g. no commits), fall back to unstaged

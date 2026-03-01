@@ -11,7 +11,7 @@ function SidebarToggle({ collapsed, onClick }: { collapsed: boolean; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className="absolute top-2 -right-3 z-20 flex items-center justify-center w-6 h-6 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700 transition-colors shadow-md"
+      className="absolute top-2 -right-3 z-10 flex items-center justify-center w-6 h-6 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-700 transition-colors shadow-md"
       title={collapsed ? "Show file list" : "Hide file list"}
     >
       <svg

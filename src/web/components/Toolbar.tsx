@@ -29,7 +29,7 @@ export default function Toolbar({
   const { state: settings, actions } = useSettings();
 
   return (
-    <header className="flex items-center gap-3 px-3 py-1.5 bg-neutral-900/95 border-b border-neutral-800/80 flex-shrink-0 backdrop-blur-sm">
+    <header className="flex items-center gap-3 px-3 py-1.5 bg-neutral-900/95 border-b border-neutral-800/80 flex-shrink-0 backdrop-blur-sm z-20">
       {/* Branch info */}
       <div className="flex items-center gap-1.5 text-xs text-neutral-400">
         <BranchIcon />

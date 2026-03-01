@@ -1,16 +1,20 @@
 import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import { FileDiff } from "@pierre/diffs/react";
-import type { ReviewComment } from "@shared/types.js";
-import { useCallback, useMemo, useState } from "react";
+import type { FileReviewState, ReviewComment } from "@shared/types.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSettings } from "../hooks/useSettings.js";
 import CommentDisplay from "./CommentDisplay.js";
 import CommentInput from "./CommentInput.js";
+import { getFileSectionId, pickActiveFile } from "./diffNavigation.js";
 
 interface DiffViewerProps {
   patch: string;
   selectedFile: string | null;
-  comments: ReviewComment[];
+  navigationTargetFile: string | null;
+  reviewFiles: Record<string, FileReviewState>;
+  onNavigationHandled: (filePath: string) => void;
+  onActiveFileChange: (filePath: string) => void;
   onAddComment: (comment: ReviewComment) => void;
   onDeleteComment: (filePath: string, commentId: string) => void;
 }
@@ -28,7 +32,10 @@ interface ActiveInput {
 export default function DiffViewer({
   patch,
   selectedFile,
-  comments,
+  navigationTargetFile,
+  reviewFiles,
+  onNavigationHandled,
+  onActiveFileChange,
   onAddComment,
   onDeleteComment,
 }: DiffViewerProps) {
@@ -37,36 +44,37 @@ export default function DiffViewer({
   } = useSettings();
   const [activeInput, setActiveInput] = useState<ActiveInput | null>(null);
 
-  const fileDiff = useMemo(() => {
+  const allFileDiffs = useMemo(() => {
     if (!patch) return null;
 
     try {
       const parsed = parsePatchFiles(patch);
-      const allFiles = parsed.flatMap((parsedPatch) => parsedPatch.files);
-
-      if (allFiles.length === 0) return null;
-      if (!selectedFile) return allFiles[0] ?? null;
-
-      return allFiles.find((file) => file.name === selectedFile) ?? null;
+      return parsed.flatMap((parsedPatch) => parsedPatch.files);
     } catch {
       return null;
     }
-  }, [patch, selectedFile]);
+  }, [patch]);
 
-  // Build line annotations from comments for @pierre/diffs
-  const lineAnnotations = useMemo(() => {
-    const annotations: DiffLineAnnotation<CommentAnnotation>[] = [];
-    for (const comment of comments) {
-      if (comment.line !== null) {
-        annotations.push({
-          side: comment.side === "deletion" ? "deletions" : "additions",
-          lineNumber: comment.line,
-          metadata: { comments: [comment] },
-        });
+  const lineAnnotationsByFile = useMemo(() => {
+    const annotations = new Map<string, DiffLineAnnotation<CommentAnnotation>[]>();
+
+    for (const [filePath, fileReview] of Object.entries(reviewFiles)) {
+      const fileAnnotations: DiffLineAnnotation<CommentAnnotation>[] = [];
+      for (const comment of fileReview.comments) {
+        if (comment.line !== null) {
+          fileAnnotations.push({
+            side: comment.side === "deletion" ? "deletions" : "additions",
+            lineNumber: comment.line,
+            metadata: { comments: [comment] },
+          });
+        }
       }
+
+      annotations.set(filePath, fileAnnotations);
     }
+
     return annotations;
-  }, [comments]);
+  }, [reviewFiles]);
 
   const handleAddComment = useCallback(
     (comment: ReviewComment) => {
@@ -94,12 +102,8 @@ export default function DiffViewer({
     [onDeleteComment],
   );
 
-  // Render the hover utility for adding comments
-  const renderHoverUtility = useCallback(
-    (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
-      // Determine file path from patch context
-      const filePath = selectedFile ?? fileDiff?.name ?? "";
-
+  const createHoverUtilityRenderer = useCallback((filePath: string) => {
+    return (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
       return (
         <button
           type="button"
@@ -121,11 +125,62 @@ export default function DiffViewer({
           +
         </button>
       );
-    },
-    [selectedFile, fileDiff],
-  );
+    };
+  }, []);
 
-  if (!patch || !fileDiff) {
+  useEffect(() => {
+    if (!navigationTargetFile) return;
+
+    const targetElement = document.getElementById(getFileSectionId(navigationTargetFile));
+    if (!targetElement) return;
+
+    const supportsSmoothScroll = "scrollBehavior" in document.documentElement.style;
+
+    targetElement.scrollIntoView({
+      behavior: supportsSmoothScroll ? "smooth" : "auto",
+      block: "start",
+    });
+    onNavigationHandled(navigationTargetFile);
+  }, [navigationTargetFile, onNavigationHandled]);
+
+  useEffect(() => {
+    if (!allFileDiffs || allFileDiffs.length === 0 || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const activeFile = pickActiveFile(
+          entries.map((entry) => ({
+            filePath: entry.target.getAttribute("data-file-path") ?? "",
+            isIntersecting: entry.isIntersecting,
+            top: entry.boundingClientRect.top,
+          })),
+        );
+
+        if (activeFile) {
+          onActiveFileChange(activeFile);
+        }
+      },
+      {
+        threshold: [0.2, 0.5, 0.8],
+        rootMargin: "-8% 0px -70% 0px",
+      },
+    );
+
+    for (const fileDiff of allFileDiffs) {
+      const section = document.getElementById(getFileSectionId(fileDiff.name));
+      if (section) {
+        observer.observe(section);
+      }
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [allFileDiffs, onActiveFileChange]);
+
+  if (!patch || !allFileDiffs || allFileDiffs.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-neutral-500">
         <div className="text-center">
@@ -138,23 +193,49 @@ export default function DiffViewer({
 
   return (
     <div className="h-full overflow-auto">
-      <FileDiff
-        fileDiff={fileDiff}
-        options={{
-          diffStyle,
-          theme: { dark: "github-dark", light: "github-light" },
-          themeType: "dark",
-          lineDiffType: "word",
-          overflow: wrapLines ? "wrap" : "scroll",
-          disableLineNumbers: !showLineNumbers,
-          expandUnchanged: true,
-          enableHoverUtility: true,
-          unsafeCSS: `:host { --diffs-font-size: ${fontSize}px; --diffs-line-height: ${lineHeight}px; }`,
-        }}
-        lineAnnotations={lineAnnotations}
-        renderAnnotation={renderAnnotation}
-        renderHoverUtility={renderHoverUtility}
-      />
+      {allFileDiffs.map((fileDiff) => {
+        const sectionId = getFileSectionId(fileDiff.name);
+        const isSelected = selectedFile === fileDiff.name;
+
+        return (
+          <section
+            key={fileDiff.name}
+            id={sectionId}
+            data-file-path={fileDiff.name}
+            className={`border-b border-neutral-800/70 ${isSelected ? "bg-blue-500/5" : ""}`}
+          >
+            <FileDiff
+              fileDiff={fileDiff}
+              options={{
+                diffStyle,
+                theme: { dark: "github-dark", light: "github-light" },
+                themeType: "dark",
+                lineDiffType: "word",
+                overflow: wrapLines ? "wrap" : "scroll",
+                disableLineNumbers: !showLineNumbers,
+                expandUnchanged: true,
+                enableHoverUtility: true,
+                unsafeCSS: `
+                  :host {
+                    --diffs-font-size: ${fontSize}px;
+                    --diffs-line-height: ${lineHeight}px;
+                  }
+                  [data-diffs-header] {
+                    position: sticky;
+                    top: 0;
+                    z-index: 5;
+                    background: color-mix(in oklab, #0a0a0a 92%, transparent);
+                    backdrop-filter: blur(4px);
+                  }
+                `,
+              }}
+              lineAnnotations={lineAnnotationsByFile.get(fileDiff.name) ?? []}
+              renderAnnotation={renderAnnotation}
+              renderHoverUtility={createHoverUtilityRenderer(fileDiff.name)}
+            />
+          </section>
+        );
+      })}
 
       {/* Active comment input overlay */}
       {activeInput && (
