@@ -1,6 +1,7 @@
-dist/
 .vite/
+dist/
+fixtures/
+node_modules/
+
 *.tgz
-node_modules
-review.xml
 pnpm-lock.yaml

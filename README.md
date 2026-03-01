@@ -81,6 +81,92 @@ local-review --mode branch --output-file /tmp/my-review.xml
 local-review -- --ignore-all-space --word-diff
 ```
 
+## Claude Code Skill — PR/MR Integration
+
+local-review ships a [Claude Code](https://claude.ai/code) skill that bridges GitHub Pull Requests and GitLab Merge Requests with the local review UI.
+
+### What the skill does
+
+| Action | Description |
+|--------|-------------|
+| `import` | Fetch review comments from a GitHub PR or GitLab MR and write them to `review.xml` |
+| `apply` | Read a `review.xml` and apply code suggestions / change instructions to the local working tree |
+
+### Requirements
+
+- [Claude Code](https://claude.ai/code) installed
+- [`gh` CLI](https://cli.github.com) (GitHub) or [`glab` CLI](https://gitlab.com/gitlab-org/cli) (GitLab), **or** a `GITHUB_TOKEN` / `GITLAB_TOKEN` environment variable as fallback
+
+### Importing PR/MR comments
+
+```
+/local-review import <PR-or-MR-URL>
+```
+
+**Examples:**
+
+```bash
+# Import all comments from a GitHub PR
+/local-review import https://github.com/owner/repo/pull/42
+
+# Import all comments from a GitLab MR
+/local-review import https://gitlab.com/group/project/-/merge_requests/7
+
+# Import only the last comment (useful for AI-generated review summaries)
+/local-review import https://github.com/owner/repo/pull/42 --last-comment
+
+# Write to a custom path
+/local-review import https://github.com/owner/repo/pull/42 --output /tmp/pr-42.xml
+```
+
+After import, open the generated `review.xml` in local-review to browse the comments alongside the diff.
+
+**What gets imported:**
+
+- Inline diff comments (attached to specific file + line)
+- General PR/MR discussion comments (Claude resolves file references from prose using `git ls-files`)
+- Comments with no resolvable file reference are stored under the synthetic path `_discussion`
+
+### Applying code suggestions
+
+```
+/local-review apply [flags]
+```
+
+**Examples:**
+
+```bash
+# Apply all suggestions from review.xml
+/local-review apply
+
+# Apply suggestions for a single file only
+/local-review apply --file src/cli/server.ts
+
+# Apply a specific comment by id
+/local-review apply --id gh-102
+
+# Read from a custom path
+/local-review apply --input /tmp/pr-42.xml
+```
+
+The skill handles three types of comment bodies:
+
+- **GitHub suggestion fences** (` ```suggestion `): replaces the referenced line(s) directly
+- **GitLab suggestion fences** (` ```suggestion:-N+M `): replaces the specified line range
+- **Prose instructions** (e.g. "rename `foo` to `bar`"): Claude interprets and applies the change
+
+Changes are applied to the working tree only — no automatic `git add` or `git commit`.
+
+### XML schema reference
+
+The `review.xml` format is documented by the XSD schema bundled with the local-review skill at `.claude/skills/local-review/assets/review.xsd`.
+
+### Help
+
+```
+/local-review help
+```
+
 ## Development
 
 ### Project Structure

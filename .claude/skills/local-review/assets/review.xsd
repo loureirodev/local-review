@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  review.xsd — XML Schema for local-review's review.xml export format.
+
+  This schema documents the structure produced by src/cli/xml-serializer.ts.
+  It is a reference artifact only — local-review does NOT perform runtime
+  validation against this schema.
+
+  Usage reference:
+    <source type="local">      requires: mode
+    <source type="github-pr">  requires: owner, repo, pr
+    <source type="gitlab-mr">  requires: project, mr
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- ===== Root ===== -->
+  <xs:element name="review" type="ReviewType"/>
+
+  <xs:complexType name="ReviewType">
+    <xs:sequence>
+      <xs:element name="timestamp" type="xs:string"/>
+      <xs:element name="source"    type="SourceType"/>
+      <xs:element name="files"     type="FilesType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ===== Source (polymorphic via 'type' attribute) ===== -->
+  <!--
+    When type="local":     mode is required; owner/repo/pr/project/mr are absent.
+    When type="github-pr": owner, repo, pr are required; mode/project/mr are absent.
+    When type="gitlab-mr": project, mr are required; mode/owner/repo/pr are absent.
+  -->
+  <xs:complexType name="SourceType">
+    <xs:attribute name="type" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="local"/>
+          <xs:enumeration value="github-pr"/>
+          <xs:enumeration value="gitlab-mr"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <!-- local -->
+    <xs:attribute name="mode">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="unstaged"/>
+          <xs:enumeration value="staged"/>
+          <xs:enumeration value="branch"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <!-- github-pr -->
+    <xs:attribute name="owner"  type="xs:string"/>
+    <xs:attribute name="repo"   type="xs:string"/>
+    <xs:attribute name="pr"     type="xs:positiveInteger"/>
+    <!-- gitlab-mr -->
+    <xs:attribute name="project" type="xs:string"/>
+    <xs:attribute name="mr"      type="xs:positiveInteger"/>
+  </xs:complexType>
+
+  <!-- ===== Files container ===== -->
+  <xs:complexType name="FilesType">
+    <xs:sequence>
+      <xs:element name="file" type="FileType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ===== File ===== -->
+  <!--
+    path="src/foo.ts"  — repo-relative file path.
+                         Special value "_discussion" holds PR/MR general
+                         comments that could not be mapped to any file.
+    viewed="false"     — whether the file has been marked as reviewed in the UI.
+  -->
+  <xs:complexType name="FileType">
+    <xs:sequence>
+      <xs:element name="comment" type="CommentType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="path"   type="xs:string"  use="required"/>
+    <xs:attribute name="viewed" type="xs:boolean" use="required"/>
+  </xs:complexType>
+
+  <!-- ===== Comment ===== -->
+  <xs:complexType name="CommentType">
+    <xs:sequence>
+      <!--
+        <file> duplicates the parent <file path="..."> attribute.
+        Present for self-contained comment serialization.
+      -->
+      <xs:element name="file"       type="xs:string"/>
+      <!--
+        <line> is omitted for file-level comments (line = null in ReviewComment).
+        When present it is a self-closing element, e.g.:
+          <line number="42" side="addition" />
+      -->
+      <xs:element name="line"       type="LineType" minOccurs="0"/>
+      <xs:element name="body"       type="xs:string"/>
+      <xs:element name="created-at" type="xs:string"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- ===== Line (self-closing) ===== -->
+  <xs:complexType name="LineType">
+    <xs:attribute name="number" type="xs:positiveInteger" use="required"/>
+    <xs:attribute name="side" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="addition"/>
+          <xs:enumeration value="deletion"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+</xs:schema>
