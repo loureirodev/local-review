@@ -2,7 +2,7 @@ import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import { FileDiff } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSettings } from "../hooks/useSettings.js";
 import CommentDisplay from "./CommentDisplay.js";
 import CommentInput from "./CommentInput.js";
@@ -143,28 +143,44 @@ export default function DiffViewer({
     onNavigationHandled(navigationTargetFile);
   }, [navigationTargetFile, onNavigationHandled]);
 
+  const intersectionStatesRef = useRef<Map<string, boolean>>(new Map());
+
   useEffect(() => {
     if (!allFileDiffs || allFileDiffs.length === 0 || typeof IntersectionObserver === "undefined") {
       return;
     }
 
+    intersectionStatesRef.current.clear();
+
     const observer = new IntersectionObserver(
       (entries) => {
-        const activeFile = pickActiveFile(
-          entries.map((entry) => ({
-            filePath: entry.target.getAttribute("data-file-path") ?? "",
-            isIntersecting: entry.isIntersecting,
-            top: entry.boundingClientRect.top,
-          })),
-        );
+        // Update stored intersection state for each changed entry
+        for (const entry of entries) {
+          const filePath = entry.target.getAttribute("data-file-path") ?? "";
+          intersectionStatesRef.current.set(filePath, entry.isIntersecting);
+        }
 
+        // Build full candidate list from all observed sections using current positions
+        const candidates = allFileDiffs
+          .map((fd) => {
+            const el = document.getElementById(getFileSectionId(fd.name));
+            if (!el) return null;
+            return {
+              filePath: fd.name,
+              isIntersecting: intersectionStatesRef.current.get(fd.name) ?? false,
+              top: el.getBoundingClientRect().top,
+            };
+          })
+          .filter((c) => c !== null);
+
+        const activeFile = pickActiveFile(candidates);
         if (activeFile) {
           onActiveFileChange(activeFile);
         }
       },
       {
-        threshold: [0.2, 0.5, 0.8],
-        rootMargin: "-8% 0px -70% 0px",
+        threshold: 0,
+        rootMargin: "0px 0px -20% 0px",
       },
     );
 
@@ -177,6 +193,7 @@ export default function DiffViewer({
 
     return () => {
       observer.disconnect();
+      intersectionStatesRef.current.clear();
     };
   }, [allFileDiffs, onActiveFileChange]);
 
