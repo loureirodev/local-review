@@ -46,31 +46,38 @@ export default function CommentInput({
   );
 
   return (
-    <div className="p-2 bg-neutral-900 border border-neutral-700/50 rounded m-1">
+    <div className="p-2 bg-neutral-900/95 border border-neutral-800/60 rounded-b-md">
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Write a comment... (Ctrl+Enter to submit)"
+        placeholder="Write a comment..."
         rows={3}
-        className="w-full px-2 py-1.5 text-sm bg-neutral-800 border border-neutral-700 rounded resize-none focus:outline-none focus:border-blue-500 text-neutral-200 placeholder-neutral-500"
+        className="w-full px-2.5 py-2 text-[13px] font-mono bg-neutral-800/50 border border-neutral-800/60 rounded-md resize-none focus:outline-none focus:border-neutral-600 text-neutral-200 placeholder-neutral-600 transition-colors leading-relaxed"
       />
-      <div className="flex justify-end gap-2 mt-1.5">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-2.5 py-1 text-xs text-neutral-400 hover:text-neutral-200 rounded transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!body.trim()}
-          className="px-2.5 py-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-700 disabled:text-neutral-500 text-white rounded transition-colors"
-        >
-          Comment
-        </button>
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[11px] text-neutral-600 font-mono">
+          <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Ctrl</kbd>
+          {" + "}
+          <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Enter</kbd>
+        </span>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-2.5 py-1 text-xs text-neutral-500 hover:text-neutral-300 rounded-md transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!body.trim()}
+            className="px-2.5 py-1 text-xs font-medium bg-neutral-700/80 hover:bg-neutral-600/80 disabled:opacity-30 text-neutral-200 rounded-md transition-colors"
+          >
+            Comment
+          </button>
+        </div>
       </div>
     </div>
   );

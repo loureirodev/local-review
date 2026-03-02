@@ -7,9 +7,9 @@ import {
 } from "../hooks/useSettings.js";
 import {
   FontSizeIcon,
-  GearIcon,
   LineNumbersIcon,
   LineSpacingIcon,
+  SettingsIcon,
   SplitIcon,
   TreeIcon,
   UnifiedIcon,
@@ -161,100 +161,103 @@ export default function SettingsPopover({
         title="Display settings"
         aria-label="Display settings"
       >
-        <GearIcon />
+        <SettingsIcon open={open} />
       </button>
-
       {/* Popover */}
-      {open ? (
-        <div className="absolute top-full right-0 mt-1.5 w-56 bg-neutral-900 border border-neutral-700/80 rounded-lg shadow-2xl shadow-black/40 z-50 overflow-hidden">
-          {/* Header */}
-          <div className="px-2.5 py-1.5 border-b border-neutral-800 text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
-            Display
-          </div>
-
-          <div className="p-1.5 space-y-0.5">
-            {/* Diff style — segmented control */}
-            <div className="px-2.5 py-1.5">
-              <div className="text-[11px] text-neutral-500 mb-1.5">Diff layout</div>
-              <div className="flex gap-1 p-0.5 bg-neutral-800 rounded">
-                <button
-                  type="button"
-                  onClick={() => onDiffStyleChange("split")}
-                  className={`flex items-center justify-center gap-1.5 flex-1 px-2 py-1 text-xs rounded transition-all duration-150 ${
-                    diffStyle === "split"
-                      ? "bg-neutral-700 text-neutral-100 shadow-sm"
-                      : "text-neutral-400 hover:text-neutral-300"
-                  }`}
-                >
-                  <SplitIcon />
-                  Split
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDiffStyleChange("unified")}
-                  className={`flex items-center justify-center gap-1.5 flex-1 px-2 py-1 text-xs rounded transition-all duration-150 ${
-                    diffStyle === "unified"
-                      ? "bg-neutral-700 text-neutral-100 shadow-sm"
-                      : "text-neutral-400 hover:text-neutral-300"
-                  }`}
-                >
-                  <UnifiedIcon />
-                  Unified
-                </button>
-              </div>
-            </div>
-
-            <div className="mx-2 border-t border-neutral-800" />
-
-            {/* Toggle options */}
-            <ToggleRow
-              icon={<WrapIcon />}
-              label="Wrap lines"
-              checked={wrapLines}
-              onChange={onWrapLinesChange}
-            />
-            <ToggleRow
-              icon={<LineNumbersIcon />}
-              label="Line numbers"
-              checked={showLineNumbers}
-              onChange={onShowLineNumbersChange}
-            />
-
-            <div className="mx-2 border-t border-neutral-800" />
-
-            {/* Font size & line height */}
-            <StepperRow
-              icon={<FontSizeIcon />}
-              label="Font size"
-              value={fontSize}
-              min={FONT_SIZE_MIN}
-              max={FONT_SIZE_MAX}
-              step={1}
-              unit="px"
-              onChange={onFontSizeChange}
-            />
-            <StepperRow
-              icon={<LineSpacingIcon />}
-              label="Line height"
-              value={lineHeight}
-              min={LINE_HEIGHT_MIN}
-              max={LINE_HEIGHT_MAX}
-              step={2}
-              unit="px"
-              onChange={onLineHeightChange}
-            />
-
-            <div className="mx-2 border-t border-neutral-800" />
-
-            <ToggleRow
-              icon={<TreeIcon />}
-              label="Nested files"
-              checked={nestedTree}
-              onChange={onNestedTreeChange}
-            />
-          </div>
+      <div
+        className={`absolute top-full right-0 mt-1.5 w-56 bg-neutral-900 border border-neutral-800/80 rounded-lg shadow-2xl shadow-black/50 z-50 overflow-hidden transition-all duration-200 origin-top-right ${
+          open
+            ? "opacity-100 scale-100 pointer-events-auto"
+            : "opacity-0 scale-95 pointer-events-none"
+        }`}
+      >
+        {/* Header */}
+        <div className="px-2.5 py-1.5 border-b border-neutral-800 text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+          Display
         </div>
-      ) : null}
+
+        <div className="p-1.5 space-y-0.5">
+          {/* Diff style — segmented control */}
+          <div className="px-2.5 py-1.5">
+            <div className="text-[11px] text-neutral-500 mb-1.5">Diff layout</div>
+            <div className="flex gap-1 p-0.5 bg-neutral-800 rounded">
+              <button
+                type="button"
+                onClick={() => onDiffStyleChange("split")}
+                className={`flex items-center justify-center gap-1.5 flex-1 px-2 py-1 text-xs rounded transition-all duration-150 ${
+                  diffStyle === "split"
+                    ? "bg-neutral-700 text-neutral-100 shadow-sm"
+                    : "text-neutral-400 hover:text-neutral-300"
+                }`}
+              >
+                <SplitIcon />
+                Split
+              </button>
+              <button
+                type="button"
+                onClick={() => onDiffStyleChange("unified")}
+                className={`flex items-center justify-center gap-1.5 flex-1 px-2 py-1 text-xs rounded transition-all duration-150 ${
+                  diffStyle === "unified"
+                    ? "bg-neutral-700 text-neutral-100 shadow-sm"
+                    : "text-neutral-400 hover:text-neutral-300"
+                }`}
+              >
+                <UnifiedIcon />
+                Unified
+              </button>
+            </div>
+          </div>
+
+          <div className="mx-2 border-t border-neutral-800" />
+
+          {/* Toggle options */}
+          <ToggleRow
+            icon={<WrapIcon />}
+            label="Wrap lines"
+            checked={wrapLines}
+            onChange={onWrapLinesChange}
+          />
+          <ToggleRow
+            icon={<LineNumbersIcon />}
+            label="Line numbers"
+            checked={showLineNumbers}
+            onChange={onShowLineNumbersChange}
+          />
+
+          <div className="mx-2 border-t border-neutral-800" />
+
+          {/* Font size & line height */}
+          <StepperRow
+            icon={<FontSizeIcon />}
+            label="Font size"
+            value={fontSize}
+            min={FONT_SIZE_MIN}
+            max={FONT_SIZE_MAX}
+            step={1}
+            unit="px"
+            onChange={onFontSizeChange}
+          />
+          <StepperRow
+            icon={<LineSpacingIcon />}
+            label="Line height"
+            value={lineHeight}
+            min={LINE_HEIGHT_MIN}
+            max={LINE_HEIGHT_MAX}
+            step={2}
+            unit="px"
+            onChange={onLineHeightChange}
+          />
+
+          <div className="mx-2 border-t border-neutral-800" />
+
+          <ToggleRow
+            icon={<TreeIcon />}
+            label="Nested files"
+            checked={nestedTree}
+            onChange={onNestedTreeChange}
+          />
+        </div>
+      </div>
     </div>
   );
 }

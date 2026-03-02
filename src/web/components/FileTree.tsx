@@ -1,7 +1,7 @@
 import type { FileReviewState } from "@shared/types.js";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useSettings } from "../hooks/useSettings.js";
-import { ChevronIcon, FolderIcon } from "./icons.js";
+import { CheckIcon, ChevronIcon, FolderIcon } from "./icons.js";
 
 interface FileTreeProps {
   files: FileInfo[];
@@ -16,12 +16,12 @@ export interface FileInfo {
   type: "new" | "deleted" | "renamed" | "renamed-changed" | "change";
 }
 
-const typeColors: Record<FileInfo["type"], string> = {
-  new: "text-green-400",
-  deleted: "text-red-400",
-  renamed: "text-blue-400",
-  "renamed-changed": "text-blue-400",
-  change: "text-yellow-400",
+const typeColors: Record<FileInfo["type"], { active: string; muted: string }> = {
+  new: { active: "text-green-400/80", muted: "text-green-400/30" },
+  deleted: { active: "text-red-400/80", muted: "text-red-400/30" },
+  renamed: { active: "text-blue-400/80", muted: "text-blue-400/30" },
+  "renamed-changed": { active: "text-blue-400/80", muted: "text-blue-400/30" },
+  change: { active: "text-yellow-400/80", muted: "text-yellow-400/30" },
 };
 
 const typeLabels: Record<FileInfo["type"], string> = {
@@ -124,12 +124,16 @@ const FileRow = memo(function FileRow({
     <button
       type="button"
       onClick={() => onSelectFile(file.name)}
-      className={`w-full text-left py-1 pr-2 text-[13px] flex items-center gap-1.5 hover:bg-neutral-800/70 transition-colors ${
-        isSelected ? "bg-neutral-800 text-neutral-100" : ""
+      className={`group w-full text-left py-1 pr-2 text-[13px] flex items-center gap-1.5 transition-colors ${
+        isSelected
+          ? "bg-neutral-800/70 text-neutral-100"
+          : isViewed
+            ? "hover:bg-neutral-800/30"
+            : "hover:bg-neutral-800/50"
       }`}
       style={{ paddingLeft: `${8 + depth * 16}px` }}
     >
-      {/* Viewed checkbox — span[role=checkbox] because <input type="checkbox"> cannot be nested inside <button> */}
+      {/* Viewed indicator */}
       {/* biome-ignore lint/a11y/useSemanticElements: interactive checkbox nested inside button requires span */}
       <span
         role="checkbox"
@@ -138,39 +142,35 @@ const FileRow = memo(function FileRow({
         tabIndex={-1}
         onClick={handleViewedClick}
         onKeyDown={handleViewedKeyDown}
-        className={`flex-shrink-0 w-3.5 h-3.5 border rounded-[3px] flex items-center justify-center cursor-pointer transition-colors ${
-          isViewed ? "bg-blue-600 border-blue-600" : "border-neutral-600 hover:border-neutral-400"
+        className={`flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+          isViewed
+            ? "bg-green-500/20 text-green-400/80"
+            : "border border-neutral-700 group-hover:border-neutral-500"
         }`}
       >
-        {isViewed ? (
-          <svg
-            aria-hidden="true"
-            className="w-2.5 h-2.5 text-white"
-            viewBox="0 0 12 12"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M2 6l3 3 5-5" />
-          </svg>
-        ) : null}
+        {isViewed ? <CheckIcon className="w-2.5 h-2.5" /> : null}
       </span>
 
       {/* Change type badge */}
       <span
-        className={`flex-shrink-0 text-[11px] font-mono font-semibold w-3 text-center ${typeColors[file.type]}`}
+        className={`flex-shrink-0 text-[11px] font-mono font-semibold w-3 text-center ${typeColors[file.type][isViewed ? "muted" : "active"]}`}
       >
         {typeLabels[file.type]}
       </span>
 
       {/* File name */}
-      <span className="truncate font-mono text-neutral-300" title={file.name}>
+      <span
+        className={`truncate font-mono transition-colors ${isViewed ? "text-neutral-600" : "text-neutral-300"}`}
+        title={file.name}
+      >
         {displayName}
       </span>
 
       {/* Comment count */}
       {commentCount > 0 ? (
-        <span className="ml-auto flex-shrink-0 text-[10px] bg-blue-600/80 text-white rounded-full px-1.5 py-px font-medium">
+        <span
+          className={`ml-auto flex-shrink-0 text-[10px] rounded-full px-1.5 py-px font-mono font-medium ${isViewed ? "bg-neutral-800/60 text-neutral-500" : "bg-neutral-800 text-neutral-400"}`}
+        >
           {commentCount}
         </span>
       ) : null}
@@ -306,18 +306,16 @@ export default function FileTree({
     return nested ? buildTree(filteredFiles) : [];
   }, [nested, filteredFiles]);
 
-  const viewedCount = Object.values(reviewFiles).filter((f) => f.viewed).length;
-
   return (
     <div className="flex flex-col h-full">
       {/* Search */}
-      <div className="p-2 border-b border-neutral-800/60">
+      <div className="p-2 border-b border-neutral-800/40">
         <input
           type="text"
           placeholder="Filter files..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full px-2 py-1 text-[13px] font-mono bg-neutral-900 border border-neutral-700/60 rounded focus:outline-none focus:border-blue-500/80 text-neutral-200 placeholder-neutral-500"
+          className="w-full px-2 py-1 text-[13px] font-mono bg-neutral-900/60 border border-neutral-800/60 rounded-md focus:outline-none focus:border-neutral-600 text-neutral-200 placeholder-neutral-600 transition-colors"
         />
       </div>
 
@@ -355,11 +353,6 @@ export default function FileTree({
                 />
               );
             })}
-      </div>
-
-      {/* Footer: progress */}
-      <div className="px-2 py-1.5 border-t border-neutral-800/60 text-[11px] text-neutral-500 font-mono">
-        {viewedCount}/{files.length} reviewed
       </div>
     </div>
   );

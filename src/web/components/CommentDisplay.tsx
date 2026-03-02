@@ -1,5 +1,6 @@
 import type { ReviewComment } from "@shared/types.js";
 import { memo } from "react";
+import { CloseIcon } from "./icons.js";
 
 interface CommentDisplayProps {
   comment: ReviewComment;
@@ -8,38 +9,42 @@ interface CommentDisplayProps {
 
 const CommentDisplay = memo(function CommentDisplay({ comment, onDelete }: CommentDisplayProps) {
   return (
-    <div className="p-2 bg-neutral-900 border border-neutral-700/50 rounded m-1">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-neutral-200 whitespace-pre-wrap break-words flex-1">
-          {comment.body}
-        </p>
+    <div className="mx-1 my-1 bg-neutral-900/80 border border-neutral-800/60 rounded-md overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center gap-2 px-2.5 py-1 border-b border-neutral-800/40 bg-neutral-900/50">
+        <span className="text-[11px] font-mono text-neutral-500">
+          {comment.line !== null ? (
+            <>
+              L{comment.line}
+              {comment.side ? <span className="text-neutral-600"> {comment.side}</span> : null}
+            </>
+          ) : (
+            "file"
+          )}
+        </span>
+        <span className="text-neutral-700">&middot;</span>
+        <span className="text-[11px] font-mono text-neutral-600">
+          {new Date(comment.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+
         <button
           type="button"
           onClick={() => onDelete(comment.id)}
-          className="flex-shrink-0 p-0.5 text-neutral-500 hover:text-red-400 transition-colors"
+          className="ml-auto flex-shrink-0 p-0.5 text-neutral-600 hover:text-red-400/80 transition-colors rounded"
           title="Delete comment"
         >
-          <svg
-            aria-hidden="true"
-            className="w-3.5 h-3.5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
+          <CloseIcon className="w-3 h-3" />
         </button>
       </div>
-      <div className="mt-1 text-xs text-neutral-500">
-        {comment.line !== null ? (
-          <span>
-            Line {comment.line}
-            {comment.side && ` (${comment.side})`}
-            {" \u00b7 "}
-          </span>
-        ) : null}
-        {new Date(comment.createdAt).toLocaleTimeString()}
+
+      {/* Body */}
+      <div className="px-2.5 py-1.5">
+        <p className="text-[13px] text-neutral-300 whitespace-pre-wrap break-words leading-relaxed">
+          {comment.body}
+        </p>
       </div>
     </div>
   );

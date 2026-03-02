@@ -54,6 +54,7 @@ function AppContent() {
   });
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [navigationTargetFile, setNavigationTargetFile] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [async, dispatchAsync] = useReducer(asyncReducer, {
     loading: true,
     error: null,
@@ -61,6 +62,18 @@ function AppContent() {
   });
 
   const { state, dispatch, addComment, deleteComment, toggleViewed } = useReview();
+
+  // Keyboard shortcut: Ctrl+B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "b") {
+        e.preventDefault();
+        setSidebarCollapsed((c) => !c);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Extract file names from the patch
   const files: FileInfo[] = useMemo(() => {
@@ -81,6 +94,12 @@ function AppContent() {
       return [];
     }
   }, [diffState.patch]);
+
+  // Review progress
+  const reviewedCount = useMemo(
+    () => Object.values(state.files).filter((f) => f.viewed).length,
+    [state.files],
+  );
 
   // Load diff data
   const loadDiff = useCallback(async () => {
@@ -173,12 +192,14 @@ function AppContent() {
     setNavigationTargetFile((current) => (current === filePath ? null : current));
   }, []);
 
+  const toggleSidebar = () => setSidebarCollapsed((c) => !c);
+
   if (async.loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-neutral-950">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-neutral-700 border-t-blue-500 rounded-full animate-spin" />
-          <p className="text-sm text-neutral-500">Loading diff...</p>
+          <div className="w-6 h-6 border-[1.5px] border-neutral-800 border-t-neutral-400 rounded-full animate-spin" />
+          <p className="text-xs text-neutral-600 font-mono">Loading diff...</p>
         </div>
       </div>
     );
@@ -188,12 +209,12 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center h-screen bg-neutral-950">
         <div className="text-center max-w-md">
-          <p className="text-red-400 text-lg">Error</p>
-          <p className="text-neutral-400 text-sm mt-2">{async.error}</p>
+          <p className="text-red-400/80 text-sm font-medium">Error</p>
+          <p className="text-neutral-500 text-xs mt-2 font-mono">{async.error}</p>
           <button
             type="button"
             onClick={loadDiff}
-            className="mt-4 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+            className="mt-4 px-3 py-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-md transition-colors"
           >
             Retry
           </button>
@@ -204,11 +225,16 @@ function AppContent() {
 
   return (
     <Layout
+      sidebarCollapsed={sidebarCollapsed}
       toolbar={
         <Toolbar
           mode={diffState.mode}
           branch={diffState.branch}
           baseBranch={diffState.baseBranch}
+          sidebarCollapsed={sidebarCollapsed}
+          reviewedCount={reviewedCount}
+          totalFiles={files.length}
+          onToggleSidebar={toggleSidebar}
           onModeChange={handleModeChange}
           onExportReview={handleExportReview}
           exporting={async.exporting}

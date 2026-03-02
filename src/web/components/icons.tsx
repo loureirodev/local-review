@@ -1,10 +1,9 @@
 /* ── Shared SVG icon components ── */
 
-export function GearIcon({ className = "" }: { className?: string }) {
+export function SettingsIcon({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className={className}
       width="16"
       height="16"
       viewBox="0 0 16 16"
@@ -14,8 +13,32 @@ export function GearIcon({ className = "" }: { className?: string }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M6.5 1.5h3l.4 1.8.6.3 1.7-.7 2.1 2.1-.7 1.7.3.6 1.8.4v3l-1.8.4-.3.6.7 1.7-2.1 2.1-1.7-.7-.6.3-.4 1.8h-3l-.4-1.8-.6-.3-1.7.7-2.1-2.1.7-1.7-.3-.6-1.8-.4v-3l1.8-.4.3-.6-.7-1.7 2.1-2.1 1.7.7.6-.3z" />
-      <circle cx="8" cy="8" r="2.5" />
+      {/* Three horizontal lines */}
+      <line x1="2.5" y1="4" x2="13.5" y2="4" />
+      <line x1="2.5" y1="8" x2="13.5" y2="8" />
+      <line x1="2.5" y1="12" x2="13.5" y2="12" />
+      {/* Slider knobs — positions shift when open */}
+      <circle
+        cx={open ? "9.5" : "5.5"}
+        cy="4"
+        r="1.5"
+        fill="currentColor"
+        className="transition-all duration-200"
+      />
+      <circle
+        cx={open ? "5" : "10"}
+        cy="8"
+        r="1.5"
+        fill="currentColor"
+        className="transition-all duration-200"
+      />
+      <circle
+        cx={open ? "11" : "7"}
+        cy="12"
+        r="1.5"
+        fill="currentColor"
+        className="transition-all duration-200"
+      />
     </svg>
   );
 }
@@ -199,6 +222,66 @@ export function ExportIcon() {
       strokeLinejoin="round"
     >
       <path d="M4 13h8M8 3v7M5 6l3-3 3 3" />
+    </svg>
+  );
+}
+
+export function CheckIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      width="10"
+      height="10"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="M2.5 6l2.5 2.5 4.5-4.5" />
+    </svg>
+  );
+}
+
+export function CloseIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    >
+      <path d="M3 3l6 6M9 3l-6 6" />
+    </svg>
+  );
+}
+
+export function SidebarIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      <line x1="5.5" y1="2.5" x2="5.5" y2="13.5" />
+      {collapsed ? null : (
+        <>
+          <line x1="3" y1="5.5" x2="4.5" y2="5.5" opacity="0.5" />
+          <line x1="3" y1="8" x2="4.5" y2="8" opacity="0.5" />
+        </>
+      )}
     </svg>
   );
 }

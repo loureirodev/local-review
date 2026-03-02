@@ -88,7 +88,7 @@ export default function DiffViewer({
     (annotation: DiffLineAnnotation<CommentAnnotation>) => {
       if (!annotation.metadata) return null;
       return (
-        <div className="border-t border-neutral-800">
+        <div className="border-t border-neutral-800/40">
           {annotation.metadata.comments.map((comment) => (
             <CommentDisplay
               key={comment.id}
@@ -119,7 +119,7 @@ export default function DiffViewer({
                 | "deletion",
             });
           }}
-          className="absolute -left-2 top-1/2 -translate-y-1/2 w-5 h-5 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-xs shadow-lg z-10 transition-colors"
+          className="absolute -left-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-neutral-700/90 hover:bg-neutral-600 text-neutral-300 hover:text-neutral-100 rounded-full flex items-center justify-center text-lg shadow-lg shadow-black/30 z-10 transition-colors border border-neutral-600/50"
           title="Add comment"
         >
           +
@@ -256,9 +256,13 @@ export default function DiffViewer({
 
       {/* Active comment input overlay */}
       {activeInput && (
-        <div className="fixed bottom-4 right-4 w-96 z-50 shadow-xl">
-          <div className="text-xs text-neutral-400 px-2 py-1 bg-neutral-800 rounded-t border border-neutral-700 border-b-0">
-            {activeInput.filePath}:{activeInput.line} ({activeInput.side})
+        <div className="fixed bottom-4 right-4 w-96 z-50 shadow-2xl shadow-black/50">
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-500 px-2.5 py-1.5 bg-neutral-900 border border-neutral-800/60 border-b-0 rounded-t-md">
+            <span className="text-neutral-400">{activeInput.filePath.split("/").pop()}</span>
+            <span className="text-neutral-700">:</span>
+            <span className="text-neutral-500">L{activeInput.line}</span>
+            <span className="text-neutral-700">&middot;</span>
+            <span className="text-neutral-600">{activeInput.side}</span>
           </div>
           <CommentInput
             filePath={activeInput.filePath}
