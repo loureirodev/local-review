@@ -10,6 +10,7 @@
     <source type="local">      requires: mode
     <source type="github-pr">  requires: owner, repo, pr
     <source type="gitlab-mr">  requires: project, mr
+    <source type="agent">      optional: agent (name of the reviewing agent)
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
@@ -30,6 +31,7 @@
     When type="local":     mode is required; owner/repo/pr/project/mr are absent.
     When type="github-pr": owner, repo, pr are required; mode/project/mr are absent.
     When type="gitlab-mr": project, mr are required; mode/owner/repo/pr are absent.
+    When type="agent":    agent is optional (name of the reviewing agent).
   -->
   <xs:complexType name="SourceType">
     <xs:attribute name="type" use="required">
@@ -38,6 +40,7 @@
           <xs:enumeration value="local"/>
           <xs:enumeration value="github-pr"/>
           <xs:enumeration value="gitlab-mr"/>
+          <xs:enumeration value="agent"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
@@ -58,6 +61,8 @@
     <!-- gitlab-mr -->
     <xs:attribute name="project" type="xs:string"/>
     <xs:attribute name="mr"      type="xs:positiveInteger"/>
+    <!-- agent -->
+    <xs:attribute name="agent"  type="xs:string"/>
   </xs:complexType>
 
   <!-- ===== Files container ===== -->
@@ -98,6 +103,11 @@
       <xs:element name="line"       type="LineType" minOccurs="0"/>
       <xs:element name="body"       type="xs:string"/>
       <xs:element name="created-at" type="xs:string"/>
+      <!--
+        <url> is optional. Present for comments imported from a forge
+        (GitHub/GitLab) to link back to the original comment.
+      -->
+      <xs:element name="url"        type="xs:anyURI" minOccurs="0"/>
     </xs:sequence>
     <xs:attribute name="id" type="xs:string" use="required"/>
   </xs:complexType>

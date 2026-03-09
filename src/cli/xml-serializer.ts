@@ -26,6 +26,9 @@ function serializeComment(comment: ReviewComment, level: number): string {
   }
   lines.push(`${indent(level + 1)}<body>${escapeXml(comment.body)}</body>`);
   lines.push(`${indent(level + 1)}<created-at>${escapeXml(comment.createdAt)}</created-at>`);
+  if (comment.url) {
+    lines.push(`${indent(level + 1)}<url>${escapeXml(comment.url)}</url>`);
+  }
   lines.push(`${indent(level)}</comment>`);
   return lines.join("\n");
 }
@@ -47,6 +50,9 @@ export function serializeReview(state: ReviewState): string {
     lines.push(
       `${indent(1)}<source type="gitlab-mr" project="${escapeXml(state.source.project)}" mr="${state.source.mr}" />`,
     );
+  } else if (state.source.type === "agent") {
+    const agentAttr = state.source.agent ? ` agent="${escapeXml(state.source.agent)}"` : "";
+    lines.push(`${indent(1)}<source type="agent"${agentAttr} />`);
   }
 
   // Files

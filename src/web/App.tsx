@@ -1,5 +1,5 @@
 import { parsePatchFiles } from "@pierre/diffs";
-import type { DiffMode, DiffResponse, ReviewState } from "@shared/types.js";
+import type { DiffMode, ReviewState } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import DiffViewer from "./components/DiffViewer.js";
 import ErrorBoundary from "./components/ErrorBoundary.js";
@@ -7,7 +7,7 @@ import FileTree, { type FileInfo } from "./components/FileTree.js";
 import Layout from "./components/Layout.js";
 import Toolbar from "./components/Toolbar.js";
 import { ReviewProvider, useReview } from "./context/ReviewContext.js";
-import { changeDiffMode, fetchDiff, submitReview } from "./hooks/api.js";
+import { changeDiffMode, fetchDiff, fetchReview, submitReview } from "./hooks/api.js";
 import { SettingsProvider } from "./hooks/useSettings.js";
 
 interface DiffState {
@@ -105,7 +105,10 @@ function AppContent() {
   const loadDiff = useCallback(async () => {
     dispatchAsync({ type: "LOAD_START" });
     try {
-      const data: DiffResponse = await fetchDiff();
+      const [data, savedReview] = await Promise.all([fetchDiff(), fetchReview()]);
+      if (savedReview) {
+        dispatch({ type: "LOAD_REVIEW", reviewState: savedReview });
+      }
       setDiffState({
         patch: data.patch,
         mode: data.source.type === "local" ? data.source.mode : "unstaged",

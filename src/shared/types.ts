@@ -6,9 +6,9 @@ export type DiffMode = "unstaged" | "staged" | "branch";
 
 export type DiffSource =
   | { type: "local"; mode: DiffMode; args?: string[] }
-  // Future: GitHub PR / GitLab MR support
   | { type: "github-pr"; owner: string; repo: string; pr: number }
-  | { type: "gitlab-mr"; project: string; mr: number };
+  | { type: "gitlab-mr"; project: string; mr: number }
+  | { type: "agent"; agent?: string };
 
 // ===== Review Types =====
 
@@ -21,6 +21,8 @@ export interface ReviewComment {
   side: "addition" | "deletion" | null;
   body: string;
   createdAt: string;
+  /** URL to the original comment on the forge (GitHub/GitLab). */
+  url?: string;
 }
 
 export interface FileReviewState {

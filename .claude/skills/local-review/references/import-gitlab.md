@@ -54,6 +54,16 @@ position     — present for diff notes, null for general notes
 - If `position` is null → general comment (no file/line).
 - Comment id prefix: `gl-<id>`.
 - Source element: `<source type="gitlab-mr" project="<project>" mr="<number>" />`
+- **Comment URL**: construct a permalink for each note:
+  - For self-hosted: `https://<host>/<project>/-/merge_requests/<mr>#note_<id>`
+  - For gitlab.com: `https://gitlab.com/<project>/-/merge_requests/<mr>#note_<id>`
+  - Store in the `<url>` element of each `<comment>`.
 
-Continue with [xml-format.md](xml-format.md) for general-comment resolution, XML assembly,
-validation, and the write + report steps.
+## Line resolution for general comments
+
+General comments (no file/line) should be resolved to specific files and lines
+whenever possible. Read [line-resolution.md](line-resolution.md) for the full
+resolution algorithm.
+
+Continue with [xml-format.md](xml-format.md) for XML assembly, validation,
+and the write + report steps.

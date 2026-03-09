@@ -1,19 +1,21 @@
 ---
 name: local-review
 description: >
-  Skill for working with review.xml files produced by local-review, a local
-  web-based git diff review tool.
+  Local web-based git diff review tool. Three actions:
 
-  Primary use — apply: a developer reviews a diff in the local-review UI, adds
-  inline comments with change requests, exports to review.xml, then asks Claude
-  to implement those changes in the local working tree. Trigger on: "apply the
-  review", "implement the review comments", "apply review.xml", "implement the
-  changes from the review", "do what the review says".
+  apply — read review.xml and implement its comments as code changes in the
+  working tree. Trigger: "apply the review", "implement the review comments",
+  "apply review.xml", "do what the review says".
 
-  Secondary use — import: fetch review comments from a GitHub PR or GitLab MR
-  and write a review.xml that can be opened in local-review. Trigger on:
-  "import PR comments", "import MR comments to review.xml", followed by a
-  GitHub PR URL or GitLab MR URL.
+  import — import review comments and write review.xml. Accepts a GitHub PR
+  URL, GitLab MR URL, or a file/text from an AI agent code review. Trigger:
+  "import PR comments", "import MR comments", "import review", "import agent
+  review", GitHub PR URL, GitLab MR URL, or a file path to review text.
+
+  open — launch the local-review UI in the browser. Starts clean by default;
+  add --existing to load a previously saved review.xml. Trigger: "open the
+  review", "open the UI", "open local-review", "show me the review", "now open
+  it", "show it in the UI".
 ---
 
 # local-review skill
@@ -21,7 +23,8 @@ description: >
 | Action | Purpose |
 |--------|---------|
 | `apply` | Read review.xml and implement code changes *(primary)* |
-| `import <URL>` | Fetch GitHub PR / GitLab MR comments → write review.xml |
+| `import <URL\|file>` | Import review comments from GitHub PR, GitLab MR, or agent review → write review.xml |
+| `open` | Launch the local-review web UI in the browser |
 | `help` | Show this reference |
 
 ---
@@ -42,12 +45,22 @@ local-review skill — available actions
       --file <path>      Only apply comments for this file path.
       --id <id>          Only apply the comment with this id.
 
-  import <PR-or-MR-URL> [flags]
-    Fetch review comments from a GitHub PR or GitLab MR and write review.xml.
+  import <URL|file> [flags]
+    Import review comments and write review.xml.
+    Accepts: GitHub PR URL, GitLab MR URL, or a file path / text
+    from an AI agent code review.
 
     Flags:
-      --last-comment     Only import the most recent comment.
+      --last-comment     Only import the most recent comment (forge only).
       --output <path>    Output path.  Default: ./review.xml
+
+  open [flags]
+    Launch the local-review web UI in the browser.
+
+    Flags:
+      --input <path>     review.xml path for exports.  Default: ./review.xml
+      --existing         Load existing review.xml into the UI on startup.
+      --port <port>      Port to listen on.  Default: random.
 
   help
     Show this help text.
@@ -74,16 +87,32 @@ The apply workflow bridges the local-review UI and the codebase:
 
 ## Action: import
 
-Fetches comments from a forge and assembles `review.xml` for local-review.
+Imports review comments from an external source and assembles `review.xml`.
 
-**Step 1 — Detect forge from URL:**
-- `https://github.com/<owner>/<repo>/pull/<N>` → GitHub
-- `https://gitlab.com/<…>/-/merge_requests/<N>` or self-hosted GitLab → GitLab
-- Otherwise: inform the user the URL format is unrecognised and stop.
+**Step 1 — Detect source type from the argument:**
+- `https://github.com/<owner>/<repo>/pull/<N>` → GitHub PR
+- `https://gitlab.com/<…>/-/merge_requests/<N>` or self-hosted GitLab → GitLab MR
+- File path (e.g. `review.md`, `/tmp/review.txt`) → Agent review (read file)
+- No argument but user provides review text inline → Agent review (parse text)
+- Otherwise: inform the user the format is unrecognised and stop.
 
 **Step 2 — Fetch, map, and write:**
 - GitHub: read [references/import-github.md](references/import-github.md)
 - GitLab: read [references/import-gitlab.md](references/import-gitlab.md)
+- Agent review: read [references/import-agent.md](references/import-agent.md)
+- Line resolution (all sources): read [references/line-resolution.md](references/line-resolution.md)
 - XML assembly, validation, and report: read [references/xml-format.md](references/xml-format.md)
 
+**Key principle**: Every comment should be resolved to the most specific file
+and line possible. Comments without line numbers are hard to visualize in the
+UI. Read source files and search for referenced code to determine exact lines.
+
 **Schema reference**: [assets/review.xsd](assets/review.xsd)
+
+---
+
+## Action: open
+
+Launches the local-review web UI so the user can review a diff interactively.
+
+**Full workflow**: read [references/open.md](references/open.md).

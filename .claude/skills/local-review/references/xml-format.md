@@ -21,6 +21,7 @@ If `--last-comment` was given:
   <line number="<line-number>" side="<addition|deletion>" />
   <body><escaped-body></body>
   <created-at><iso-datetime></created-at>
+  <url><permalink-to-original-comment></url>   <!-- forge imports only -->
 </comment>
 ```
 
@@ -30,8 +31,12 @@ If `--last-comment` was given:
 2. Scan the comment body for file path mentions (backtick-quoted paths, "in `file.ts`",
    function names followed by a filename, etc.).
 3. For each mention that fuzzy-matches a tracked path (substring or basename match),
-   produce one `<comment>` attached to that file (no `<line>` element).
-4. If no file reference can be resolved, produce one `<comment>` with
+   produce one `<comment>` attached to that file.
+4. **Resolve to a specific line** whenever possible — see
+   [line-resolution.md](line-resolution.md) for the full algorithm. Read the
+   target file and search for referenced code (function names, variables,
+   snippets) to determine the exact line number.
+5. If no file reference can be resolved, produce one `<comment>` with
    `<file>_discussion</file>` (no `<line>` element).
 
 All text content must be XML-escaped: `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`.
@@ -48,6 +53,7 @@ The `_discussion` bucket, if present, goes last.
   <timestamp><current-ISO-datetime></timestamp>
   <source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>" />
   <!-- OR: <source type="gitlab-mr" project="<project>" mr="<number>" /> -->
+  <!-- OR: <source type="agent" /> -->
   <files>
     <file path="<path>" viewed="false">
       <comment id="gh-123">
@@ -55,6 +61,7 @@ The `_discussion` bucket, if present, goes last.
         <line number="42" side="addition" />   <!-- omit for file-level comments -->
         <body>Rename this variable.</body>
         <created-at>2024-01-15T10:30:00Z</created-at>
+        <url>https://github.com/owner/repo/pull/1#discussion_r123</url>  <!-- optional -->
       </comment>
     </file>
     <!-- ... -->
@@ -71,10 +78,12 @@ Cross-check the generated XML against [../assets/review.xsd](../assets/review.xs
 
 - Root element is `<review>`.
 - `<timestamp>` present and non-empty.
-- `<source>` has a valid `type` attribute (`local`, `github-pr`, or `gitlab-mr`).
+- `<source>` has a valid `type` attribute (`local`, `github-pr`, `gitlab-mr`, or `agent`).
 - `type="github-pr"`: `owner`, `repo`, and `pr` (integer) are present.
 - `type="gitlab-mr"`: `project` and `mr` (integer) are present.
+- `type="agent"`: `agent` is optional (string).
 - Each `<comment>` has `id` attribute plus `<file>`, `<body>`, `<created-at>` children.
+- `<url>` is optional; when present it must be a valid URL.
 - `<line>` when present has `number` (positive integer) and `side` (`"addition"` or `"deletion"`).
 - `viewed` on `<file>` is `"true"` or `"false"`.
 

@@ -17,6 +17,7 @@ Options:
   --port <port>        Port to listen on (default: random available port)
   --no-open            Don't open the browser automatically
   --output-file <file> Output file for review XML (default: ./review.xml)
+  --existing           Load existing review XML on startup (uses --output-file path)
   --mode <mode>        Diff mode: unstaged, staged, branch (default: unstaged)
   --dev                Development mode (proxy to Vite dev server)
   -h, --help           Show this help message
@@ -40,6 +41,7 @@ function parseArgs(argv: string[]): {
   port: number;
   noOpen: boolean;
   outputFile: string;
+  loadExisting: boolean;
   mode: DiffMode;
   devMode: boolean;
   extraArgs: string[];
@@ -49,6 +51,7 @@ function parseArgs(argv: string[]): {
     port: 0, // 0 = random available port (overridden in dev mode)
     noOpen: false,
     outputFile: "./review.xml",
+    loadExisting: false,
     mode: "unstaged" as DiffMode,
     devMode: false,
     extraArgs: [] as string[],
@@ -82,6 +85,10 @@ function parseArgs(argv: string[]): {
 
       case "--no-open":
         result.noOpen = true;
+        break;
+
+      case "--existing":
+        result.loadExisting = true;
         break;
 
       case "--output-file":
@@ -141,6 +148,7 @@ async function main(): Promise<void> {
     port: args.port,
     cwd,
     outputFile: args.outputFile,
+    loadExisting: args.loadExisting,
     initialMode: args.mode,
     extraArgs: args.extraArgs,
     devMode: args.devMode,

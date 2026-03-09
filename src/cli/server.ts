@@ -4,12 +4,14 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { DiffMode, DiffResponse, ReviewState } from "../shared/types.js";
 import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git.js";
+import { deserializeReview } from "./xml-deserializer.js";
 import { serializeReview } from "./xml-serializer.js";
 
 interface ServerOptions {
   port: number;
   cwd: string;
   outputFile: string;
+  loadExisting: boolean;
   initialMode: DiffMode;
   extraArgs: string[];
   devMode: boolean;
@@ -77,6 +79,20 @@ async function handleApiRequest(
       return jsonResponse({ ok: true, mode: currentMode });
     } catch {
       return jsonResponse({ error: "Invalid request body" }, 400);
+    }
+  }
+
+  // GET /api/review — load existing review from XML file (null if --existing not set or file absent)
+  if (pathname === "/api/review" && req.method === "GET") {
+    if (!opts.loadExisting) {
+      return jsonResponse(null);
+    }
+    try {
+      const outputPath = resolve(opts.cwd, opts.outputFile);
+      const xml = await Bun.file(outputPath).text();
+      return jsonResponse(deserializeReview(xml));
+    } catch {
+      return jsonResponse(null);
     }
   }
 

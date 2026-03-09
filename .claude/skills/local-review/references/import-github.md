@@ -59,6 +59,16 @@ created_at — ISO datetime
 - Line: use `line` if non-null, otherwise `original_line`.
 - Comment id prefix: `gh-<id>`.
 - Source element: `<source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>" />`
+- **Comment URL**: construct a permalink for each comment:
+  - Review comment (inline): `https://github.com/<owner>/<repo>/pull/<pr>#discussion_r<id>`
+  - General comment (issue-style): `https://github.com/<owner>/<repo>/pull/<pr>#issuecomment-<id>`
+  - Store in the `<url>` element of each `<comment>`.
 
-Continue with [xml-format.md](xml-format.md) for general-comment resolution, XML assembly,
-validation, and the write + report steps.
+## Line resolution for general comments
+
+General comments (no file/line) should be resolved to specific files and lines
+whenever possible. Read [line-resolution.md](line-resolution.md) for the full
+resolution algorithm.
+
+Continue with [xml-format.md](xml-format.md) for XML assembly, validation,
+and the write + report steps.

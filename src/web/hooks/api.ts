@@ -4,36 +4,35 @@ import type { DiffMode, DiffResponse, ReviewState } from "@shared/types.js";
 
 const BASE = "";
 
-export async function fetchDiff(): Promise<DiffResponse> {
-  const res = await fetch(`${BASE}/api/diff`);
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${url}`, init);
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error ?? "Failed to fetch diff");
+    const body = await res.json();
+    throw new Error(body.error ?? `Request failed: ${res.status}`);
   }
   return res.json();
 }
 
-export async function changeDiffMode(mode: DiffMode): Promise<void> {
-  const res = await fetch(`${BASE}/api/diff/mode`, {
+export function fetchDiff(): Promise<DiffResponse> {
+  return api("/api/diff");
+}
+
+export function changeDiffMode(mode: DiffMode): Promise<void> {
+  return api("/api/diff/mode", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode }),
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error ?? "Failed to change mode");
-  }
 }
 
-export async function submitReview(state: ReviewState): Promise<{ path: string }> {
-  const res = await fetch(`${BASE}/api/review`, {
+export function fetchReview(): Promise<ReviewState | null> {
+  return api("/api/review");
+}
+
+export function submitReview(state: ReviewState): Promise<{ path: string }> {
+  return api("/api/review", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(state),
   });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error ?? "Failed to submit review");
-  }
-  return res.json();
 }

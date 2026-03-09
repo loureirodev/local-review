@@ -1,4 +1,4 @@
-import type { DiffSource, FileReviewState, ReviewComment } from "@shared/types.js";
+import type { DiffSource, FileReviewState, ReviewComment, ReviewState } from "@shared/types.js";
 import { createContext, type Dispatch, type ReactNode, use, useCallback, useReducer } from "react";
 
 // ===== State =====
@@ -18,6 +18,7 @@ const initialState: ReviewStateLocal = {
 type ReviewAction =
   | { type: "INIT_FILES"; filePaths: string[] }
   | { type: "SET_SOURCE"; source: DiffSource }
+  | { type: "LOAD_REVIEW"; reviewState: ReviewState }
   | { type: "TOGGLE_VIEWED"; filePath: string }
   | { type: "ADD_COMMENT"; comment: ReviewComment }
   | { type: "DELETE_COMMENT"; filePath: string; commentId: string }
@@ -32,6 +33,14 @@ function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewSta
   switch (action.type) {
     case "SET_SOURCE":
       return { ...state, source: action.source };
+
+    case "LOAD_REVIEW": {
+      const files: Record<string, FileReviewState> = {};
+      for (const file of action.reviewState.files) {
+        files[file.path] = file;
+      }
+      return { ...state, files, source: action.reviewState.source };
+    }
 
     case "INIT_FILES": {
       const files: Record<string, FileReviewState> = {};
