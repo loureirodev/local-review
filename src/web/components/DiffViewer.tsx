@@ -7,6 +7,7 @@ import { useSettings } from "../hooks/useSettings.js";
 import CommentDisplay from "./CommentDisplay.js";
 import CommentInput from "./CommentInput.js";
 import { getFileSectionId, pickActiveFile } from "./diffNavigation.js";
+import { compareByTreeOrder } from "./FileTree.js";
 
 interface DiffViewerProps {
   patch: string;
@@ -49,7 +50,9 @@ export default function DiffViewer({
 
     try {
       const parsed = parsePatchFiles(patch);
-      return parsed.flatMap((parsedPatch) => parsedPatch.files);
+      return parsed
+        .flatMap((parsedPatch) => parsedPatch.files)
+        .sort((a, b) => compareByTreeOrder(a.name, b.name));
     } catch {
       return null;
     }

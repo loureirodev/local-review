@@ -3,7 +3,7 @@ import type { DiffMode, ReviewState } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import DiffViewer from "./components/DiffViewer.js";
 import ErrorBoundary from "./components/ErrorBoundary.js";
-import FileTree, { type FileInfo } from "./components/FileTree.js";
+import FileTree, { compareByTreeOrder, type FileInfo } from "./components/FileTree.js";
 import Layout from "./components/Layout.js";
 import Toolbar from "./components/Toolbar.js";
 import { ReviewProvider, useReview } from "./context/ReviewContext.js";
@@ -81,15 +81,17 @@ function AppContent() {
     try {
       const parsed = parsePatchFiles(diffState.patch);
       const allFiles = parsed.flatMap((p) => p.files);
-      return allFiles.map((f) => ({
-        name: f.name,
-        type:
-          f.type === "rename-pure" || f.type === "rename-changed"
-            ? f.type === "rename-pure"
-              ? ("renamed" as const)
-              : ("renamed-changed" as const)
-            : (f.type as FileInfo["type"]),
-      }));
+      return allFiles
+        .map((f) => ({
+          name: f.name,
+          type:
+            f.type === "rename-pure" || f.type === "rename-changed"
+              ? f.type === "rename-pure"
+                ? ("renamed" as const)
+                : ("renamed-changed" as const)
+              : (f.type as FileInfo["type"]),
+        }))
+        .sort((a, b) => compareByTreeOrder(a.name, b.name));
     } catch {
       return [];
     }
