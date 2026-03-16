@@ -33,7 +33,7 @@ function parseComment(commentXml: string): ReviewComment {
   const body = getTagContent(commentXml, "body") ?? "";
   const createdAt = getTagContent(commentXml, "created-at") ?? "";
 
-  const lineMatch = commentXml.match(/<line number="(\d+)" side="([^"]*)" \/>/);
+  const lineMatch = commentXml.match(/<line number="(\d+)" side="([^"]*)"\s*\/>/);
   const line = lineMatch ? parseInt(lineMatch[1], 10) : null;
   const side = lineMatch ? (lineMatch[2] as "addition" | "deletion") : null;
 
