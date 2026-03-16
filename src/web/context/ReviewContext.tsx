@@ -106,7 +106,9 @@ function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewSta
           [action.filePath]: {
             ...file,
             comments: file.comments.map((c) =>
-              c.id === action.commentId ? { ...c, body: action.body } : c,
+              c.id === action.commentId
+                ? { ...c, body: action.body, ...(c.url ? { edited: true } : {}) }
+                : c,
             ),
           },
         },

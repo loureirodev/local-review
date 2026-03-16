@@ -17,7 +17,8 @@ function indent(level: number): string {
 
 function serializeComment(comment: ReviewComment, level: number): string {
   const lines: string[] = [];
-  lines.push(`${indent(level)}<comment id="${escapeXml(comment.id)}">`);
+  const editedAttr = comment.edited ? ' edited="true"' : "";
+  lines.push(`${indent(level)}<comment id="${escapeXml(comment.id)}"${editedAttr}>`);
   lines.push(`${indent(level + 1)}<file>${escapeXml(comment.filePath)}</file>`);
   if (comment.line !== null) {
     lines.push(

@@ -23,6 +23,8 @@ export interface ReviewComment {
   createdAt: string;
   /** URL to the original comment on the forge (GitHub/GitLab). */
   url?: string;
+  /** Whether this comment was edited locally after being imported from a forge. */
+  edited?: boolean;
 }
 
 export interface FileReviewState {

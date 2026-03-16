@@ -3,6 +3,7 @@ import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import { FileDiff } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useReview } from "../context/ReviewContext.js";
 import { useSettings } from "../hooks/useSettings.js";
 import CommentDisplay from "./CommentDisplay.js";
 import CommentInput from "./CommentInput.js";
@@ -18,6 +19,7 @@ interface DiffViewerProps {
   onActiveFileChange: (filePath: string) => void;
   onAddComment: (comment: ReviewComment) => void;
   onDeleteComment: (filePath: string, commentId: string) => void;
+  onUpdateComment: (filePath: string, commentId: string, body: string) => void;
 }
 
 interface CommentAnnotation {
@@ -39,10 +41,14 @@ export default function DiffViewer({
   onActiveFileChange,
   onAddComment,
   onDeleteComment,
+  onUpdateComment,
 }: DiffViewerProps) {
   const {
     state: { diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight },
   } = useSettings();
+  const {
+    state: { source },
+  } = useReview();
   const [activeInput, setActiveInput] = useState<ActiveInput | null>(null);
 
   const allFileDiffs = useMemo(() => {
@@ -96,13 +102,15 @@ export default function DiffViewer({
             <CommentDisplay
               key={comment.id}
               comment={comment}
+              source={source}
               onDelete={(id) => onDeleteComment(comment.filePath, id)}
+              onUpdate={(id, body) => onUpdateComment(comment.filePath, id, body)}
             />
           ))}
         </div>
       );
     },
-    [onDeleteComment],
+    [source, onDeleteComment, onUpdateComment],
   );
 
   const createHoverUtilityRenderer = useCallback((filePath: string) => {

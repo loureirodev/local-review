@@ -110,6 +110,8 @@
       <xs:element name="url"        type="xs:anyURI" minOccurs="0"/>
     </xs:sequence>
     <xs:attribute name="id" type="xs:string" use="required"/>
+    <!-- edited is true when comment body was modified locally from imported content -->
+    <xs:attribute name="edited" type="xs:boolean"/>
   </xs:complexType>
 
   <!-- ===== Line (self-closing) ===== -->

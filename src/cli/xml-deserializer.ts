@@ -38,12 +38,13 @@ function parseComment(commentXml: string): ReviewComment {
   const side = lineMatch ? (lineMatch[2] as "addition" | "deletion") : null;
 
   const url = getTagContent(commentXml, "url") ?? undefined;
+  const edited = getAttr(commentXml, "edited") === "true" ? true : undefined;
 
-  return { id, filePath, line, side, body, createdAt, url };
+  return { id, filePath, line, side, body, createdAt, url, edited };
 }
 
 function parseSource(xml: string): DiffSource {
-  const sourceMatch = xml.match(/<source ([^/]*)\s*\/>/);
+  const sourceMatch = xml.match(/<source ([^>]*?)\s*\/>/);
   if (!sourceMatch) return { type: "local", mode: "unstaged" };
 
   const tag = sourceMatch[1];

@@ -61,7 +61,7 @@ function AppContent() {
     exporting: false,
   });
 
-  const { state, dispatch, addComment, deleteComment, toggleViewed } = useReview();
+  const { state, dispatch, addComment, deleteComment, updateComment, toggleViewed } = useReview();
 
   // Keyboard shortcut: Ctrl+B to toggle sidebar
   useEffect(() => {
@@ -110,6 +110,8 @@ function AppContent() {
       const [data, savedReview] = await Promise.all([fetchDiff(), fetchReview()]);
       if (savedReview) {
         dispatch({ type: "LOAD_REVIEW", reviewState: savedReview });
+      } else {
+        dispatch({ type: "SET_SOURCE", source: data.source });
       }
       setDiffState({
         patch: data.patch,
@@ -117,7 +119,6 @@ function AppContent() {
         branch: data.info.branch,
         baseBranch: data.info.baseBranch,
       });
-      dispatch({ type: "SET_SOURCE", source: data.source });
       dispatchAsync({ type: "LOAD_SUCCESS" });
     } catch (err) {
       dispatchAsync({
@@ -265,6 +266,7 @@ function AppContent() {
           onActiveFileChange={handleActiveFileChange}
           onAddComment={addComment}
           onDeleteComment={deleteComment}
+          onUpdateComment={updateComment}
         />
       </ErrorBoundary>
     </Layout>

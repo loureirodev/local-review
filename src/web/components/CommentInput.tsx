@@ -65,7 +65,7 @@ export default function CommentInput({
           <button
             type="button"
             onClick={onCancel}
-            className="px-2.5 py-1 text-xs text-neutral-500 hover:text-neutral-300 rounded-md transition-colors"
+            className="px-2 py-0.5 text-[11px] font-mono text-neutral-400 hover:text-neutral-200 transition-colors rounded"
           >
             Cancel
           </button>
@@ -73,7 +73,7 @@ export default function CommentInput({
             type="button"
             onClick={handleSubmit}
             disabled={!body.trim()}
-            className="px-2.5 py-1 text-xs font-medium bg-neutral-700/80 hover:bg-neutral-600/80 disabled:opacity-30 text-neutral-200 rounded-md transition-colors"
+            className="px-2 py-0.5 text-[11px] font-mono bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Comment
           </button>
