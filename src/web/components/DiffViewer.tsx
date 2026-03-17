@@ -1,5 +1,5 @@
 import { parsePatchFiles } from "@pierre/diffs";
-import type { DiffLineAnnotation } from "@pierre/diffs/react";
+import type { DiffLineAnnotation, FileDiffMetadata } from "@pierre/diffs/react";
 import { FileDiff } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +8,40 @@ import { useSettings } from "../hooks/useSettings.js";
 import CommentDisplay from "./CommentDisplay.js";
 import CommentInput from "./CommentInput.js";
 import { getFileSectionId, pickActiveFile } from "./diffNavigation.js";
+import FileCommentsDrawer from "./FileCommentsDrawer.js";
 import { compareByTreeOrder } from "./FileTree.js";
+
+/** Extract the set of visible line numbers per side from a parsed file diff. */
+function getVisibleLines(fileDiff: FileDiffMetadata): {
+  additions: Set<number>;
+  deletions: Set<number>;
+} {
+  const additions = new Set<number>();
+  const deletions = new Set<number>();
+
+  for (const hunk of fileDiff.hunks) {
+    let addLine = hunk.additionStart;
+    let delLine = hunk.deletionStart;
+
+    for (const content of hunk.hunkContent) {
+      if (content.type === "context") {
+        for (let i = 0; i < content.lines.length; i++) {
+          additions.add(addLine++);
+          deletions.add(delLine++);
+        }
+      } else {
+        for (let i = 0; i < content.deletions.length; i++) {
+          deletions.add(delLine++);
+        }
+        for (let i = 0; i < content.additions.length; i++) {
+          additions.add(addLine++);
+        }
+      }
+    }
+  }
+
+  return { additions, deletions };
+}
 
 interface DiffViewerProps {
   patch: string;
@@ -28,8 +61,8 @@ interface CommentAnnotation {
 
 interface ActiveInput {
   filePath: string;
-  line: number;
-  side: "addition" | "deletion";
+  line: number | null;
+  side: "addition" | "deletion" | null;
 }
 
 export default function DiffViewer({
@@ -64,18 +97,34 @@ export default function DiffViewer({
     }
   }, [patch]);
 
+  /** Map of visible line numbers per file, keyed by file name. */
+  const visibleLinesByFile = useMemo(() => {
+    const map = new Map<string, { additions: Set<number>; deletions: Set<number> }>();
+    if (!allFileDiffs) return map;
+    for (const fd of allFileDiffs) {
+      map.set(fd.name, getVisibleLines(fd));
+    }
+    return map;
+  }, [allFileDiffs]);
+
   const lineAnnotationsByFile = useMemo(() => {
     const annotations = new Map<string, DiffLineAnnotation<CommentAnnotation>[]>();
 
     for (const [filePath, fileReview] of Object.entries(reviewFiles)) {
+      const visible = visibleLinesByFile.get(filePath);
       const fileAnnotations: DiffLineAnnotation<CommentAnnotation>[] = [];
       for (const comment of fileReview.comments) {
         if (comment.line !== null) {
-          fileAnnotations.push({
-            side: comment.side === "deletion" ? "deletions" : "additions",
-            lineNumber: comment.line,
-            metadata: { comments: [comment] },
-          });
+          const side = comment.side === "deletion" ? "deletions" : "additions";
+          const lineSet = side === "deletions" ? visible?.deletions : visible?.additions;
+          // Only add as inline annotation if line exists in the diff
+          if (!lineSet || lineSet.has(comment.line)) {
+            fileAnnotations.push({
+              side,
+              lineNumber: comment.line,
+              metadata: { comments: [comment] },
+            });
+          }
         }
       }
 
@@ -83,7 +132,42 @@ export default function DiffViewer({
     }
 
     return annotations;
-  }, [reviewFiles]);
+  }, [reviewFiles, visibleLinesByFile]);
+
+  /** File-level comments: explicit file comments + orphaned line comments. */
+  const fileLevelCommentsByFile = useMemo(() => {
+    const map = new Map<string, ReviewComment[]>();
+
+    for (const [filePath, fileReview] of Object.entries(reviewFiles)) {
+      const visible = visibleLinesByFile.get(filePath);
+      const fileComments: ReviewComment[] = [];
+
+      for (const comment of fileReview.comments) {
+        if (comment.line === null) {
+          // Explicit file-level comment
+          fileComments.push(comment);
+        } else if (visible) {
+          // Check if this line comment is orphaned (line not in current diff)
+          const lineSet = comment.side === "deletion" ? visible.deletions : visible.additions;
+          if (!lineSet.has(comment.line)) {
+            fileComments.push(comment);
+          }
+        }
+      }
+
+      if (fileComments.length > 0) {
+        map.set(filePath, fileComments);
+      }
+    }
+
+    return map;
+  }, [reviewFiles, visibleLinesByFile]);
+
+  /** Which file's drawer is open, and whether to show the input immediately. */
+  const [drawerState, setDrawerState] = useState<{
+    filePath: string;
+    showInput: boolean;
+  } | null>(null);
 
   const handleAddComment = useCallback(
     (comment: ReviewComment) => {
@@ -138,6 +222,67 @@ export default function DiffViewer({
       );
     };
   }, []);
+
+  const openDrawer = useCallback((filePath: string, showInput = false) => {
+    setDrawerState({ filePath, showInput });
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerState(null);
+  }, []);
+
+  const createHeaderMetadataRenderer = useCallback(
+    (filePath: string, fileComments: ReviewComment[]) => {
+      const count = fileComments.length;
+      return () => (
+        <span
+          style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginLeft: "8px" }}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openDrawer(filePath, count === 0);
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "1px 6px",
+              fontSize: "11px",
+              fontFamily: "monospace",
+              background: count > 0 ? "rgba(64, 64, 64, 0.6)" : "rgba(64, 64, 64, 0.4)",
+              border: `1px solid ${count > 0 ? "rgba(82, 82, 82, 0.5)" : "rgba(82, 82, 82, 0.4)"}`,
+              borderRadius: "4px",
+              color: count > 0 ? "#a3a3a3" : "#737373",
+              cursor: "pointer",
+            }}
+            title={
+              count > 0
+                ? `${count} file-level comment${count !== 1 ? "s" : ""}`
+                : "Add file comment"
+            }
+          >
+            <svg
+              aria-hidden="true"
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5l-3 3V3z" />
+            </svg>
+            {count > 0 ? count : "+"}
+          </button>
+        </span>
+      );
+    },
+    [openDrawer],
+  );
 
   useEffect(() => {
     if (!navigationTargetFile) return;
@@ -219,11 +364,16 @@ export default function DiffViewer({
     );
   }
 
+  const drawerComments = drawerState
+    ? (fileLevelCommentsByFile.get(drawerState.filePath) ?? [])
+    : [];
+
   return (
     <div className="h-full overflow-auto">
       {allFileDiffs.map((fileDiff) => {
         const sectionId = getFileSectionId(fileDiff.name);
         const isSelected = selectedFile === fileDiff.name;
+        const fileComments = fileLevelCommentsByFile.get(fileDiff.name) ?? [];
 
         return (
           <section
@@ -260,20 +410,42 @@ export default function DiffViewer({
               lineAnnotations={lineAnnotationsByFile.get(fileDiff.name) ?? []}
               renderAnnotation={renderAnnotation}
               renderHoverUtility={createHoverUtilityRenderer(fileDiff.name)}
+              renderHeaderMetadata={createHeaderMetadataRenderer(fileDiff.name, fileComments)}
             />
           </section>
         );
       })}
+
+      {/* File-level comments drawer */}
+      <FileCommentsDrawer
+        filePath={drawerState?.filePath ?? null}
+        comments={drawerComments}
+        source={source}
+        showInput={drawerState?.showInput ?? false}
+        onClose={closeDrawer}
+        onAddComment={onAddComment}
+        onDeleteComment={onDeleteComment}
+        onUpdateComment={onUpdateComment}
+      />
 
       {/* Active comment input overlay */}
       {activeInput && (
         <div className="fixed bottom-4 right-4 w-96 z-50 shadow-2xl shadow-black/50">
           <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-500 px-2.5 py-1.5 bg-neutral-900 border border-neutral-800/60 border-b-0 rounded-t-md">
             <span className="text-neutral-400">{activeInput.filePath.split("/").pop()}</span>
-            <span className="text-neutral-700">:</span>
-            <span className="text-neutral-500">L{activeInput.line}</span>
-            <span className="text-neutral-700">&middot;</span>
-            <span className="text-neutral-600">{activeInput.side}</span>
+            {activeInput.line !== null ? (
+              <>
+                <span className="text-neutral-700">:</span>
+                <span className="text-neutral-500">L{activeInput.line}</span>
+                <span className="text-neutral-700">&middot;</span>
+                <span className="text-neutral-600">{activeInput.side}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-neutral-700">&middot;</span>
+                <span className="text-neutral-600">File comment</span>
+              </>
+            )}
           </div>
           <CommentInput
             filePath={activeInput.filePath}

@@ -50,6 +50,8 @@ function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }
 interface CommentDisplayProps {
   comment: ReviewComment;
   source: DiffSource | null;
+  /** When true, this is an orphaned line comment shown in the file-level panel. */
+  orphanedLine?: boolean;
   onDelete: (commentId: string) => void;
   onUpdate: (commentId: string, body: string) => void;
 }
@@ -57,6 +59,7 @@ interface CommentDisplayProps {
 const CommentDisplay = memo(function CommentDisplay({
   comment,
   source,
+  orphanedLine,
   onDelete,
   onUpdate,
 }: CommentDisplayProps) {
@@ -115,6 +118,9 @@ const CommentDisplay = memo(function CommentDisplay({
             <>
               L{comment.line}
               {comment.side ? <span className="text-neutral-600"> {comment.side}</span> : null}
+              {orphanedLine ? (
+                <span className="text-neutral-600 italic"> — not in current diff</span>
+              ) : null}
             </>
           ) : (
             "file"
