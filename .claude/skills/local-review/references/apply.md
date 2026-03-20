@@ -45,6 +45,23 @@ For each comment in the filtered list, determine the kind of change it requests:
 
 - Skip. Note as "skipped (no action)".
 
+### Handling `side` attribute
+
+- `side="addition"` (right side of diff): the line number refers to the current
+  version of the file. Read the file and apply the change at that line directly.
+- `side="deletion"` (left side of diff): the line number refers to code that was
+  removed. The current file may not have that line anymore. Search for the
+  referenced code snippet in the comment body and apply the change where the
+  surrounding context exists. If the deleted code is no longer present and the
+  comment is not applicable, skip it and note as "skipped (deleted code)".
+
+### Handling `edited` attribute
+
+Comments with `edited="true"` were modified by the user in the local-review UI
+after being imported from a forge (GitHub/GitLab). The body reflects the user's
+revised intent — always use the body as-is, which already contains the edited
+version.
+
 **IMPORTANT**: Do NOT run `git add` or `git commit`. Only modify the working tree.
 
 ## Step 4 — Handle errors without aborting

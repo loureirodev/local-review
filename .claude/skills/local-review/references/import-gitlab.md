@@ -59,6 +59,20 @@ position     — present for diff notes, null for general notes
   - For gitlab.com: `https://gitlab.com/<project>/-/merge_requests/<mr>#note_<id>`
   - Store in the `<url>` element of each `<comment>`.
 
+## Filtering comments
+
+Before mapping, filter out noise that would clutter the review:
+
+- **Bot comments**: skip notes from known bots (author `username` containing
+  `bot`, or common bots like `dependabot`, `renovate`, `gitlab-bot`).
+- **Resolved threads**: GitLab discussions have a `resolved` boolean at the
+  discussion level. When `resolved: true`, the thread has been marked as
+  addressed. Omit resolved discussions unless `--include-resolved` is
+  explicitly requested.
+- **Author replies**: short replies like "fixed", "done", "will do", "addressed"
+  from the MR author are acknowledgments, not actionable review comments. Skip
+  them unless they contain code suggestions or substantive discussion.
+
 ## Line resolution for general comments
 
 General comments (no file/line) should be resolved to specific files and lines

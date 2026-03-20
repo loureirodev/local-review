@@ -64,6 +64,20 @@ created_at — ISO datetime
   - General comment (issue-style): `https://github.com/<owner>/<repo>/pull/<pr>#issuecomment-<id>`
   - Store in the `<url>` element of each `<comment>`.
 
+## Filtering comments
+
+Before mapping, filter out noise that would clutter the review:
+
+- **Bot comments**: skip comments from known bots (author login ending in `[bot]`,
+  or common bots like `dependabot`, `renovate`, `codecov`, `sonarcloud`).
+- **Resolved threads**: if fetching review comments, check `pull_request_review_id`
+  grouping. When all comments in a thread are resolved (user marked as resolved
+  in GitHub), consider omitting them — they represent already-addressed feedback.
+  Include them only if `--include-resolved` is explicitly requested.
+- **Author replies**: short replies like "fixed", "done", "will do", "addressed"
+  from the PR author are acknowledgments, not actionable review comments. Skip
+  them unless they contain code suggestions or substantive discussion.
+
 ## Line resolution for general comments
 
 General comments (no file/line) should be resolved to specific files and lines

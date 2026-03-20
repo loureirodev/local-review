@@ -10,7 +10,8 @@ description: >
   import — import review comments and write review.xml. Accepts a GitHub PR
   URL, GitLab MR URL, or a file/text from an AI agent code review. Trigger:
   "import PR comments", "import MR comments", "import review", "import agent
-  review", GitHub PR URL, GitLab MR URL, or a file path to review text.
+  review", "review this PR", "check the PR feedback", "load review comments",
+  GitHub PR URL, GitLab MR URL, or a file path to review text.
 
   open — launch the local-review UI in the browser. Starts clean by default;
   add --existing to load a previously saved review.xml. Trigger: "open the
@@ -20,51 +21,13 @@ description: >
 
 # local-review skill
 
-| Action | Purpose |
-|--------|---------|
-| `apply` | Read review.xml and implement code changes *(primary)* |
-| `import <URL\|file>` | Import review comments from GitHub PR, GitLab MR, or agent review → write review.xml |
-| `open` | Launch the local-review web UI in the browser |
-| `help` | Show this reference |
+| Action | Purpose | Key flags |
+|--------|---------|-----------|
+| `apply` | Read review.xml and implement code changes *(primary)* | `--input`, `--file`, `--id` |
+| `import <URL\|file>` | Import review comments from GitHub PR, GitLab MR, or agent review → write review.xml | `--last-comment`, `--output` |
+| `open` | Launch the local-review web UI in the browser | `--existing`, `--port`, `--input` |
 
----
-
-## Action: help
-
-When invoked with `help` or no action, print:
-
-```
-local-review skill — available actions
-
-  apply [flags]                              ← primary workflow
-    Read review.xml produced by the local-review UI and apply every
-    actionable comment as a code change in the local working tree.
-
-    Flags:
-      --input <path>     review.xml path.  Default: ./review.xml
-      --file <path>      Only apply comments for this file path.
-      --id <id>          Only apply the comment with this id.
-
-  import <URL|file> [flags]
-    Import review comments and write review.xml.
-    Accepts: GitHub PR URL, GitLab MR URL, or a file path / text
-    from an AI agent code review.
-
-    Flags:
-      --last-comment     Only import the most recent comment (forge only).
-      --output <path>    Output path.  Default: ./review.xml
-
-  open [flags]
-    Launch the local-review web UI in the browser.
-
-    Flags:
-      --input <path>     review.xml path for exports.  Default: ./review.xml
-      --existing         Load existing review.xml into the UI on startup.
-      --port <port>      Port to listen on.  Default: random.
-
-  help
-    Show this help text.
-```
+When invoked with `help` or no action, describe these actions and their flags.
 
 ---
 

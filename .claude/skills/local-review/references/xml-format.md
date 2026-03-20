@@ -107,7 +107,5 @@ Import complete — review.xml written to <output-path>
   Unresolved:     <N>  (stored under _discussion)
 
 To view in local-review:
-  bun run preview -- --output-file <output-path>
-  -- or --
-  Open local-review and load the file from the UI.
+  local-review --output-file <output-path> --existing
 ```
