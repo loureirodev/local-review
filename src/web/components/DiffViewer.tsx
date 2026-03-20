@@ -25,15 +25,15 @@ function getVisibleLines(fileDiff: FileDiffMetadata): {
 
     for (const content of hunk.hunkContent) {
       if (content.type === "context") {
-        for (let i = 0; i < content.lines.length; i++) {
+        for (let i = 0; i < content.lines; i++) {
           additions.add(addLine++);
           deletions.add(delLine++);
         }
       } else {
-        for (let i = 0; i < content.deletions.length; i++) {
+        for (let i = 0; i < content.deletions; i++) {
           deletions.add(delLine++);
         }
-        for (let i = 0; i < content.additions.length; i++) {
+        for (let i = 0; i < content.additions; i++) {
           additions.add(addLine++);
         }
       }
