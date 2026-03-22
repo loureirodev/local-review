@@ -6,6 +6,7 @@ on:
       - "v*"
 
 permissions:
+  id-token: write
   contents: write
   packages: write
 
@@ -73,8 +74,6 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   github-release:
     name: GitHub Release
