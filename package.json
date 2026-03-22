@@ -1,6 +1,6 @@
 {
   "name": "@loureirodev/local-review",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local code review UI that turns GitHub PRs, GitLab MRs, and local diffs into actionable review files for AI agents.",
   "type": "module",
   "bin": {
