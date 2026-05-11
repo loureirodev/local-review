@@ -1,5 +1,6 @@
 import type { FileReviewState } from "@shared/types.js";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useCollapse } from "../context/CollapseContext.js";
 import { useSettings } from "../hooks/useSettings.js";
 import { CheckIcon, ChevronIcon, FolderIcon } from "./icons.js";
 
@@ -264,6 +265,38 @@ const TreeNodeRow = memo(function TreeNodeRow({
   );
 });
 
+/* ── Footer ── */
+
+function CollapseFooter() {
+  const { totalFiles, collapsedCount, setAllCollapsed } = useCollapse();
+  if (totalFiles === 0) return null;
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 border-t border-neutral-800/50 bg-neutral-950/40 text-[11px] text-neutral-500">
+      <span className="flex-1 truncate">
+        {totalFiles} file{totalFiles !== 1 ? "s" : ""}
+        {collapsedCount > 0 && ` · ${collapsedCount} collapsed`}
+      </span>
+      <button
+        type="button"
+        onClick={() => setAllCollapsed(true)}
+        className="hover:text-neutral-300 transition-colors"
+        title="Collapse all files"
+      >
+        Collapse all
+      </button>
+      <span className="text-neutral-700">·</span>
+      <button
+        type="button"
+        onClick={() => setAllCollapsed(false)}
+        className="hover:text-neutral-300 transition-colors"
+        title="Expand all files"
+      >
+        Expand all
+      </button>
+    </div>
+  );
+}
+
 /* ── Main Component ── */
 
 export default function FileTree({
@@ -368,6 +401,8 @@ export default function FileTree({
               );
             })}
       </div>
+
+      <CollapseFooter />
     </div>
   );
 }

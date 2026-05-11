@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary.js";
 import FileTree, { compareByTreeOrder, type FileInfo } from "./components/FileTree.js";
 import Layout from "./components/Layout.js";
 import Toolbar from "./components/Toolbar.js";
+import { CollapseProvider } from "./context/CollapseContext.js";
 import { ReviewProvider, useReview } from "./context/ReviewContext.js";
 import { changeDiffMode, fetchDiff, fetchReview, submitReview } from "./hooks/api.js";
 import { SettingsProvider } from "./hooks/useSettings.js";
@@ -185,13 +186,11 @@ function AppContent() {
     }
   }, [state, diffState.mode]);
 
+  const filePaths = useMemo(() => files.map((f) => f.name), [files]);
+
   const handleSelectFile = useCallback((filePath: string) => {
     setSelectedFile(filePath);
     setNavigationTargetFile(filePath);
-  }, []);
-
-  const handleActiveFileChange = useCallback((filePath: string) => {
-    setSelectedFile((current) => (current === filePath ? current : filePath));
   }, []);
 
   const handleNavigationHandled = useCallback((filePath: string) => {
@@ -230,46 +229,47 @@ function AppContent() {
   }
 
   return (
-    <Layout
-      sidebarCollapsed={sidebarCollapsed}
-      toolbar={
-        <Toolbar
-          mode={diffState.mode}
-          branch={diffState.branch}
-          baseBranch={diffState.baseBranch}
-          sidebarCollapsed={sidebarCollapsed}
-          reviewedCount={reviewedCount}
-          totalFiles={files.length}
-          onToggleSidebar={toggleSidebar}
-          onModeChange={handleModeChange}
-          onExportReview={handleExportReview}
-          exporting={async.exporting}
-        />
-      }
-      sidebar={
-        <FileTree
-          files={files}
-          reviewFiles={state.files}
-          selectedFile={selectedFile}
-          onSelectFile={handleSelectFile}
-          onToggleViewed={toggleViewed}
-        />
-      }
-    >
-      <ErrorBoundary>
-        <DiffViewer
-          patch={diffState.patch}
-          selectedFile={selectedFile}
-          navigationTargetFile={navigationTargetFile}
-          reviewFiles={state.files}
-          onNavigationHandled={handleNavigationHandled}
-          onActiveFileChange={handleActiveFileChange}
-          onAddComment={addComment}
-          onDeleteComment={deleteComment}
-          onUpdateComment={updateComment}
-        />
-      </ErrorBoundary>
-    </Layout>
+    <CollapseProvider filePaths={filePaths} reviewFiles={state.files}>
+      <Layout
+        sidebarCollapsed={sidebarCollapsed}
+        toolbar={
+          <Toolbar
+            mode={diffState.mode}
+            branch={diffState.branch}
+            baseBranch={diffState.baseBranch}
+            sidebarCollapsed={sidebarCollapsed}
+            reviewedCount={reviewedCount}
+            totalFiles={files.length}
+            onToggleSidebar={toggleSidebar}
+            onModeChange={handleModeChange}
+            onExportReview={handleExportReview}
+            exporting={async.exporting}
+          />
+        }
+        sidebar={
+          <FileTree
+            files={files}
+            reviewFiles={state.files}
+            selectedFile={selectedFile}
+            onSelectFile={handleSelectFile}
+            onToggleViewed={toggleViewed}
+          />
+        }
+      >
+        <ErrorBoundary>
+          <DiffViewer
+            patch={diffState.patch}
+            selectedFile={selectedFile}
+            navigationTargetFile={navigationTargetFile}
+            reviewFiles={state.files}
+            onNavigationHandled={handleNavigationHandled}
+            onAddComment={addComment}
+            onDeleteComment={deleteComment}
+            onUpdateComment={updateComment}
+          />
+        </ErrorBoundary>
+      </Layout>
+    </CollapseProvider>
   );
 }
 
