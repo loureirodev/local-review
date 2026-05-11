@@ -1,10 +1,11 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
-import { computeHeaderHeight, MAX_ESTIMATED_LINES } from "./constants.js";
-import type { DiffListProps } from "./diffListShared.js";
-import { EMPTY_ANNOTATIONS, EMPTY_COMMENTS } from "./diffParsing.js";
-import { FileDiffSection } from "./FileDiffSection.js";
-import { FloatingFileIndicator } from "./FloatingFileIndicator.js";
+import { computeHeaderHeight, MAX_ESTIMATED_LINES } from "./constants";
+import type { DiffListProps } from "./diffListShared";
+import { EMPTY_ANNOTATIONS, EMPTY_COMMENTS } from "./diffParsing";
+import { FileDiffSection } from "./FileDiffSection";
+import { FloatingFileIndicator } from "./FloatingFileIndicator";
+import { usePinnedFile } from "./usePinnedFile";
 
 export function VirtualizedDiffList({
   allFileDiffs,
@@ -29,6 +30,10 @@ export function VirtualizedDiffList({
 }: DiffListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerHeight = computeHeaderHeight(lineHeight);
+  const getIsCollapsedRef = useRef(getIsCollapsed);
+  useEffect(() => {
+    getIsCollapsedRef.current = getIsCollapsed;
+  });
 
   const virtualizer = useVirtualizer({
     count: allFileDiffs.length,
@@ -104,27 +109,10 @@ export function VirtualizedDiffList({
     };
   }, [navigationTargetFile, allFileDiffs, virtualizer, onNavigationHandled]);
 
-  // Pinned header: detect which expanded file's header has scrolled out of view
-  // while its body still extends below.
   const [pinnedFile, setPinnedFile] = useState<string | null>(null);
+  const displayedPinnedFile = usePinnedFile(pinnedFile);
   const rafRef = useRef<number | null>(null);
 
-  // Delayed-unmount mirror so the indicator can run its exit animation when
-  // pinnedFile becomes null.
-  const [displayedPinnedFile, setDisplayedPinnedFile] = useState<string | null>(null);
-  useEffect(() => {
-    if (pinnedFile) {
-      setDisplayedPinnedFile(pinnedFile);
-      return;
-    }
-    if (displayedPinnedFile === null) return;
-    const t = setTimeout(() => setDisplayedPinnedFile(null), 150);
-    return () => clearTimeout(t);
-  }, [pinnedFile, displayedPinnedFile]);
-
-  // virtualizer + getIsCollapsed accessed via closure (always current);
-  // re-binding the listener on every collapse change would be wasteful.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: closure is intentional
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || allFileDiffs.length === 0) return;
@@ -139,7 +127,7 @@ export function VirtualizedDiffList({
         for (const item of virtualizer.getVirtualItems()) {
           if (item.start <= scrollTop && scrollTop < item.start + item.size) {
             const fileDiff = allFileDiffs[item.index];
-            if (fileDiff && !getIsCollapsed(fileDiff.name)) {
+            if (fileDiff && !getIsCollapsedRef.current(fileDiff.name)) {
               const headerBottom = item.start + headerHeight;
               if (headerBottom <= scrollTop && item.start + item.size > scrollTop + headerHeight) {
                 found = fileDiff.name;
@@ -161,7 +149,7 @@ export function VirtualizedDiffList({
         rafRef.current = null;
       }
     };
-  }, [allFileDiffs, headerHeight]);
+  }, [allFileDiffs, headerHeight, virtualizer]);
 
   const displayedFile = displayedPinnedFile
     ? (allFileDiffs.find((fd) => fd.name === displayedPinnedFile) ?? null)
@@ -205,7 +193,6 @@ export function VirtualizedDiffList({
               >
                 <FileDiffSection
                   fileDiff={fileDiff}
-                  filePath={fileDiff.name}
                   isSelected={selectedFile === fileDiff.name}
                   isCollapsed={getIsCollapsed(fileDiff.name)}
                   isViewed={reviewFiles[fileDiff.name]?.viewed ?? false}

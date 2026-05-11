@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "bun run --watch src/cli/index.ts -- --dev",
-    "build": "vite build && bun build src/cli/index.ts --outdir dist/cli --target bun --external react --external react-dom --external @pierre/diffs",
+    "build": "vite build && bun build src/cli/index.ts --outdir dist/cli --target bun --external react --external react-dom --external @pierre/diffs --external @pierre/trees",
     "preview": "bun run dist/cli/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@pierre/diffs": "^1.1.21",
+    "@pierre/trees": "1.0.0-beta.3",
     "@radix-ui/react-dialog": "^1.1.15",
     "@tanstack/react-virtual": "^3.13.24",
     "react": "^19.2.0",

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { getFileSectionId } from "../diffNavigation.js";
-import { computeHeaderHeight } from "./constants.js";
-import type { DiffListProps } from "./diffListShared.js";
-import { EMPTY_ANNOTATIONS, EMPTY_COMMENTS } from "./diffParsing.js";
-import { FileDiffSection } from "./FileDiffSection.js";
-import { FloatingFileIndicator } from "./FloatingFileIndicator.js";
+import { getFileSectionId } from "../diffNavigation";
+import { computeHeaderHeight } from "./constants";
+import type { DiffListProps } from "./diffListShared";
+import { EMPTY_ANNOTATIONS, EMPTY_COMMENTS } from "./diffParsing";
+import { FileDiffSection } from "./FileDiffSection";
+import { FloatingFileIndicator } from "./FloatingFileIndicator";
+import { usePinnedFile } from "./usePinnedFile";
 
 export function PlainDiffList({
   allFileDiffs,
@@ -29,8 +30,11 @@ export function PlainDiffList({
 }: DiffListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const headerHeight = computeHeaderHeight(lineHeight);
+  const getIsCollapsedRef = useRef(getIsCollapsed);
+  useEffect(() => {
+    getIsCollapsedRef.current = getIsCollapsed;
+  });
 
-  // Smooth-scroll navigation to the target file's section.
   useEffect(() => {
     if (!navigationTargetFile) return;
     const sectionId = getFileSectionId(navigationTargetFile);
@@ -41,24 +45,10 @@ export function PlainDiffList({
     onNavigationHandled(navigationTargetFile);
   }, [navigationTargetFile, onNavigationHandled]);
 
-  // Pinned header detection via DOM rects. With <2k total lines the section
-  // count is small enough that a per-frame pass over getBoundingClientRect is
-  // cheap.
   const [pinnedFile, setPinnedFile] = useState<string | null>(null);
+  const displayedPinnedFile = usePinnedFile(pinnedFile);
   const rafRef = useRef<number | null>(null);
 
-  const [displayedPinnedFile, setDisplayedPinnedFile] = useState<string | null>(null);
-  useEffect(() => {
-    if (pinnedFile) {
-      setDisplayedPinnedFile(pinnedFile);
-      return;
-    }
-    if (displayedPinnedFile === null) return;
-    const t = setTimeout(() => setDisplayedPinnedFile(null), 150);
-    return () => clearTimeout(t);
-  }, [pinnedFile, displayedPinnedFile]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: closure is intentional
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || allFileDiffs.length === 0) return;
@@ -71,13 +61,12 @@ export function PlainDiffList({
 
         let found: string | null = null;
         for (const fd of allFileDiffs) {
-          if (getIsCollapsed(fd.name)) continue;
+          if (getIsCollapsedRef.current(fd.name)) continue;
           const section = document.getElementById(getFileSectionId(fd.name));
           if (!section) continue;
           const rect = section.getBoundingClientRect();
           const top = rect.top - containerTop;
           const bottom = rect.bottom - containerTop;
-          // Header has fully scrolled out, body still below the viewport top.
           if (top + headerHeight <= 0 && bottom > headerHeight) {
             found = fd.name;
             break;
@@ -121,7 +110,6 @@ export function PlainDiffList({
             <FileDiffSection
               key={fileDiff.name}
               fileDiff={fileDiff}
-              filePath={fileDiff.name}
               isSelected={selectedFile === fileDiff.name}
               isCollapsed={getIsCollapsed(fileDiff.name)}
               isViewed={reviewFiles[fileDiff.name]?.viewed ?? false}

@@ -2,10 +2,10 @@
 
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { DiffMode, DiffResponse, ReviewState } from "../shared/types.js";
-import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git.js";
-import { deserializeReview } from "./xml-deserializer.js";
-import { serializeReview } from "./xml-serializer.js";
+import type { DiffMode, DiffResponse, ReviewState } from "../shared/types";
+import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
+import { deserializeReview } from "./xml-deserializer";
+import { serializeReview } from "./xml-serializer";
 
 interface ServerOptions {
   port: number;

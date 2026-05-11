@@ -1,6 +1,6 @@
 // Git operations using Bun.spawn
 
-import type { DiffMode } from "../shared/types.js";
+import type { DiffMode } from "../shared/types";
 
 /** Run a shell command and return its stdout. */
 async function run(cmd: string[], cwd?: string, allowedExitCodes: number[] = [0]): Promise<string> {

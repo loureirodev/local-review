@@ -4,29 +4,26 @@ import {
   FONT_SIZE_MIN,
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
-} from "../hooks/useSettings.js";
+} from "../hooks/useSettings";
 import {
   FontSizeIcon,
   LineNumbersIcon,
   LineSpacingIcon,
   SettingsIcon,
   SplitIcon,
-  TreeIcon,
   UnifiedIcon,
   WrapIcon,
-} from "./icons.js";
+} from "./icons";
 
 interface SettingsPopoverProps {
   diffStyle: "split" | "unified";
   wrapLines: boolean;
   showLineNumbers: boolean;
-  nestedTree: boolean;
   fontSize: number;
   lineHeight: number;
   onDiffStyleChange: (style: "split" | "unified") => void;
   onWrapLinesChange: (wrap: boolean) => void;
   onShowLineNumbersChange: (show: boolean) => void;
-  onNestedTreeChange: (nested: boolean) => void;
   onFontSizeChange: (size: number) => void;
   onLineHeightChange: (height: number) => void;
 }
@@ -116,13 +113,11 @@ export default function SettingsPopover({
   diffStyle,
   wrapLines,
   showLineNumbers,
-  nestedTree,
   fontSize,
   lineHeight,
   onDiffStyleChange,
   onWrapLinesChange,
   onShowLineNumbersChange,
-  onNestedTreeChange,
   onFontSizeChange,
   onLineHeightChange,
 }: SettingsPopoverProps) {
@@ -246,15 +241,6 @@ export default function SettingsPopover({
             step={2}
             unit="px"
             onChange={onLineHeightChange}
-          />
-
-          <div className="mx-2 border-t border-neutral-800" />
-
-          <ToggleRow
-            icon={<TreeIcon />}
-            label="Nested files"
-            checked={nestedTree}
-            onChange={onNestedTreeChange}
           />
         </div>
       </div>

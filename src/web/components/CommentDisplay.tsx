@@ -1,6 +1,6 @@
 import type { DiffSource, ReviewComment } from "@shared/types.js";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { AgentIcon, CloseIcon, GitHubIcon, GitLabIcon, PencilIcon, UserIcon } from "./icons.js";
+import { AgentIcon, CloseIcon, GitHubIcon, GitLabIcon, PencilIcon, UserIcon } from "./icons";
 
 function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }) {
   if (!source) return null;

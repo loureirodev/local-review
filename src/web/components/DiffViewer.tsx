@@ -2,22 +2,22 @@ import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useCallback, useState } from "react";
-import { useCollapse } from "../context/CollapseContext.js";
-import { useReview } from "../context/ReviewContext.js";
-import { useSettings } from "../hooks/useSettings.js";
-import CommentDisplay from "./CommentDisplay.js";
-import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay.js";
+import { useCollapse } from "../context/CollapseContext";
+import { useReview } from "../context/ReviewContext";
+import { useSettings } from "../hooks/useSettings";
+import CommentDisplay from "./CommentDisplay";
+import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay";
 import {
   HIGHLIGHTER_OPTIONS,
   VIRTUALIZATION_THRESHOLD,
   WORKER_POOL_OPTIONS,
-} from "./diff/constants.js";
-import type { CommentAnnotation } from "./diff/diffParsing.js";
-import { EMPTY_COMMENTS } from "./diff/diffParsing.js";
-import { PlainDiffList } from "./diff/PlainDiffList.js";
-import { useDiffData } from "./diff/useDiffData.js";
-import { VirtualizedDiffList } from "./diff/VirtualizedDiffList.js";
-import FileCommentsDrawer from "./FileCommentsDrawer.js";
+} from "./diff/constants";
+import type { CommentAnnotation } from "./diff/diffParsing";
+import { EMPTY_COMMENTS } from "./diff/diffParsing";
+import { PlainDiffList } from "./diff/PlainDiffList";
+import { useDiffData } from "./diff/useDiffData";
+import { VirtualizedDiffList } from "./diff/VirtualizedDiffList";
+import FileCommentsDrawer from "./FileCommentsDrawer";
 
 interface DiffViewerProps {
   patch: string;

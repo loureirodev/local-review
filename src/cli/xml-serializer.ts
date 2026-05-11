@@ -1,6 +1,6 @@
 // XML serializer: ReviewState → XML with custom schema
 
-import type { ReviewComment, ReviewState } from "../shared/types.js";
+import type { ReviewComment, ReviewState } from "../shared/types";
 
 function escapeXml(str: string): string {
   return str

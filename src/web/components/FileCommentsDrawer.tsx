@@ -1,9 +1,9 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { DiffSource, ReviewComment } from "@shared/types.js";
 import { useCallback, useState } from "react";
-import CommentDisplay from "./CommentDisplay.js";
-import CommentInput from "./CommentInput.js";
-import { CloseIcon } from "./icons.js";
+import CommentDisplay from "./CommentDisplay";
+import CommentInput from "./CommentInput";
+import { CloseIcon } from "./icons";
 
 interface FileCommentsDrawerProps {
   filePath: string | null;

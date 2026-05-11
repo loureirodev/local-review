@@ -1,6 +1,6 @@
 import type { DiffLineAnnotation, FileDiffMetadata } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
-import type { CommentAnnotation, FileDiffSummary } from "./diffParsing.js";
+import type { CommentAnnotation, FileDiffSummary } from "./diffParsing";
 
 export interface DiffListProps {
   allFileDiffs: FileDiffMetadata[];

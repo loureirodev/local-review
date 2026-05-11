@@ -1,15 +1,16 @@
 import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffMode, ReviewState } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import DiffViewer from "./components/DiffViewer.js";
-import ErrorBoundary from "./components/ErrorBoundary.js";
-import FileTree, { compareByTreeOrder, type FileInfo } from "./components/FileTree.js";
-import Layout from "./components/Layout.js";
-import Toolbar from "./components/Toolbar.js";
-import { CollapseProvider } from "./context/CollapseContext.js";
-import { ReviewProvider, useReview } from "./context/ReviewContext.js";
-import { changeDiffMode, fetchDiff, fetchReview, submitReview } from "./hooks/api.js";
-import { SettingsProvider } from "./hooks/useSettings.js";
+import DiffViewer from "./components/DiffViewer";
+import ErrorBoundary from "./components/ErrorBoundary";
+import FileTree, { type FileInfo } from "./components/FileTree";
+import Layout from "./components/Layout";
+import Toolbar from "./components/Toolbar";
+import { CollapseProvider } from "./context/CollapseContext";
+import { ReviewProvider, useReview } from "./context/ReviewContext";
+import { changeDiffMode, fetchDiff, fetchReview, submitReview } from "./hooks/api";
+import { SettingsProvider } from "./hooks/useSettings";
+import { compareByTreeOrder } from "./utils/treeOrder";
 
 interface DiffState {
   patch: string;
@@ -62,9 +63,8 @@ function AppContent() {
     exporting: false,
   });
 
-  const { state, dispatch, addComment, deleteComment, updateComment, toggleViewed } = useReview();
+  const { state, dispatch, addComment, deleteComment, updateComment } = useReview();
 
-  // Keyboard shortcut: Ctrl+B to toggle sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "b") {
@@ -76,7 +76,6 @@ function AppContent() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Extract file names from the patch
   const files: FileInfo[] = useMemo(() => {
     if (!diffState.patch) return [];
     try {
@@ -98,13 +97,11 @@ function AppContent() {
     }
   }, [diffState.patch]);
 
-  // Review progress
   const reviewedCount = useMemo(
     () => Object.values(state.files).filter((f) => f.viewed).length,
     [state.files],
   );
 
-  // Load diff data
   const loadDiff = useCallback(async () => {
     dispatchAsync({ type: "LOAD_START" });
     try {
@@ -129,7 +126,6 @@ function AppContent() {
     }
   }, [dispatch]);
 
-  // Initialize files in review state when patch changes
   useEffect(() => {
     if (files.length > 0) {
       dispatch({
@@ -143,12 +139,10 @@ function AppContent() {
     }
   }, [files, dispatch, selectedFile]);
 
-  // Load diff on mount
   useEffect(() => {
     loadDiff();
   }, [loadDiff]);
 
-  // Handle mode change
   const handleModeChange = useCallback(
     async (newMode: DiffMode) => {
       try {
@@ -165,7 +159,6 @@ function AppContent() {
     [loadDiff],
   );
 
-  // Handle export
   const handleExportReview = useCallback(async () => {
     dispatchAsync({ type: "EXPORT_START" });
     try {
@@ -197,7 +190,7 @@ function AppContent() {
     setNavigationTargetFile((current) => (current === filePath ? null : current));
   }, []);
 
-  const toggleSidebar = () => setSidebarCollapsed((c) => !c);
+  const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
 
   if (async.loading) {
     return (
@@ -252,7 +245,6 @@ function AppContent() {
             reviewFiles={state.files}
             selectedFile={selectedFile}
             onSelectFile={handleSelectFile}
-            onToggleViewed={toggleViewed}
           />
         }
       >

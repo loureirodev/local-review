@@ -2,14 +2,13 @@ import type { DiffLineAnnotation, FileDiffMetadata } from "@pierre/diffs/react";
 import { FileDiff } from "@pierre/diffs/react";
 import type { ReviewComment } from "@shared/types.js";
 import { memo, useCallback } from "react";
-import { getFileSectionId } from "../diffNavigation.js";
-import { THEME } from "./constants.js";
-import type { CommentAnnotation, HoverUtilityRenderer } from "./diffParsing.js";
-import { FileCommentBadge, HeaderChevron, ViewedToggle } from "./HeaderControls.js";
+import { getFileSectionId } from "../diffNavigation";
+import { THEME } from "./constants";
+import type { CommentAnnotation, HoverUtilityRenderer } from "./diffParsing";
+import { FileCommentBadge, HeaderChevron, ViewedToggle } from "./HeaderControls";
 
 interface FileDiffSectionProps {
   fileDiff: FileDiffMetadata;
-  filePath: string;
   isSelected: boolean;
   isCollapsed: boolean;
   isViewed: boolean;
@@ -29,7 +28,6 @@ interface FileDiffSectionProps {
 
 export const FileDiffSection = memo(function FileDiffSection({
   fileDiff,
-  filePath,
   isSelected,
   isCollapsed,
   isViewed,
@@ -46,6 +44,7 @@ export const FileDiffSection = memo(function FileDiffSection({
   onRequestLineComment,
   onOpenDrawer,
 }: FileDiffSectionProps) {
+  const filePath = fileDiff.name;
   const sectionId = getFileSectionId(filePath);
 
   const handleToggleCollapse = useCallback(() => {
@@ -120,6 +119,8 @@ export const FileDiffSection = memo(function FileDiffSection({
             :host {
               --diffs-font-size: ${fontSize}px;
               --diffs-line-height: ${lineHeight}px;
+              --diffs-font-family: var(--font-mono);
+              --diffs-header-font-family: var(--font-mono);
             }
             /* Default is "overflow: scroll clip", which always shows the
                horizontal scrollbar even when content fits or wrap is enabled.

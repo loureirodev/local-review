@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 // CLI entry point for local-review
 
-import type { DiffMode } from "../shared/types.js";
-import { isGitRepo } from "./git.js";
-import { openBrowser } from "./open-browser.js";
-import { startServer } from "./server.js";
+import type { DiffMode } from "../shared/types";
+import { isGitRepo } from "./git";
+import { openBrowser } from "./open-browser";
+import { startServer } from "./server";
 
 function printHelp(): void {
   console.error(

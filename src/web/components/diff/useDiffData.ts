@@ -2,13 +2,13 @@ import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useMemo } from "react";
-import { compareByTreeOrder } from "../FileTree.js";
+import { compareByTreeOrder } from "../../utils/treeOrder";
 import {
   type CommentAnnotation,
   type FileDiffSummary,
   getVisibleLines,
   summarizeFileDiff,
-} from "./diffParsing.js";
+} from "./diffParsing";
 
 export interface DiffData {
   allFileDiffs: ReturnType<typeof parsePatchFiles>[number]["files"] | null;
@@ -55,13 +55,17 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
     return total;
   }, [summaryByFile]);
 
-  const lineAnnotationsByFile = useMemo(() => {
+  const { lineAnnotationsByFile, fileLevelCommentsByFile } = useMemo(() => {
     const annotations = new Map<string, DiffLineAnnotation<CommentAnnotation>[]>();
+    const fileLevelMap = new Map<string, ReviewComment[]>();
     for (const [filePath, fileReview] of Object.entries(reviewFiles)) {
       const visible = visibleLinesByFile.get(filePath);
       const fileAnnotations: DiffLineAnnotation<CommentAnnotation>[] = [];
+      const fileComments: ReviewComment[] = [];
       for (const comment of fileReview.comments) {
-        if (comment.line !== null) {
+        if (comment.line === null) {
+          fileComments.push(comment);
+        } else {
           const side = comment.side === "deletion" ? "deletions" : "additions";
           const lineSet = side === "deletions" ? visible?.deletions : visible?.additions;
           if (!lineSet || lineSet.has(comment.line)) {
@@ -70,34 +74,15 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
               lineNumber: comment.line,
               metadata: { comments: [comment] },
             });
-          }
-        }
-      }
-      annotations.set(filePath, fileAnnotations);
-    }
-    return annotations;
-  }, [reviewFiles, visibleLinesByFile]);
-
-  const fileLevelCommentsByFile = useMemo(() => {
-    const map = new Map<string, ReviewComment[]>();
-    for (const [filePath, fileReview] of Object.entries(reviewFiles)) {
-      const visible = visibleLinesByFile.get(filePath);
-      const fileComments: ReviewComment[] = [];
-      for (const comment of fileReview.comments) {
-        if (comment.line === null) {
-          fileComments.push(comment);
-        } else if (visible) {
-          const lineSet = comment.side === "deletion" ? visible.deletions : visible.additions;
-          if (!lineSet.has(comment.line)) {
+          } else {
             fileComments.push(comment);
           }
         }
       }
-      if (fileComments.length > 0) {
-        map.set(filePath, fileComments);
-      }
+      annotations.set(filePath, fileAnnotations);
+      if (fileComments.length > 0) fileLevelMap.set(filePath, fileComments);
     }
-    return map;
+    return { lineAnnotationsByFile: annotations, fileLevelCommentsByFile: fileLevelMap };
   }, [reviewFiles, visibleLinesByFile]);
 
   return {
