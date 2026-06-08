@@ -9,8 +9,7 @@ async function run(cmd: string[], cwd?: string, allowedExitCodes: number[] = [0]
     stdout: "pipe",
     stderr: "pipe",
   });
-  const stdout = await new Response(proc.stdout).text();
-  const exitCode = await proc.exited;
+  const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
   if (!allowedExitCodes.includes(exitCode)) {
     const stderr = await new Response(proc.stderr).text();
     throw new Error(`Command failed: ${cmd.join(" ")}\n${stderr}`);

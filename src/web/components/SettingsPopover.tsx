@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -86,7 +86,7 @@ function StepperRow({
           type="button"
           onClick={() => onChange(Math.max(min, value - step))}
           disabled={value <= min}
-          className="w-5 h-5 flex items-center justify-center rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-neutral-300 transition-colors"
+          className="size-5 flex items-center justify-center rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-neutral-300 transition-colors"
         >
           −
         </button>
@@ -98,7 +98,7 @@ function StepperRow({
           type="button"
           onClick={() => onChange(Math.min(max, value + step))}
           disabled={value >= max}
-          className="w-5 h-5 flex items-center justify-center rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-neutral-300 transition-colors"
+          className="size-5 flex items-center justify-center rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-neutral-300 transition-colors"
         >
           +
         </button>
@@ -126,8 +126,9 @@ export default function SettingsPopover({
   const openRef = useRef(open);
   openRef.current = open;
 
-  // Close on outside click — listener registered once, openRef read at event time
-  const handleOutsideClick = useCallback((e: MouseEvent) => {
+  // Close on outside click — handler stored in ref so the effect registers once
+  const handleOutsideClickRef = useRef<(e: MouseEvent) => void>(null!);
+  handleOutsideClickRef.current = (e: MouseEvent) => {
     if (
       openRef.current &&
       containerRef.current &&
@@ -135,12 +136,13 @@ export default function SettingsPopover({
     ) {
       setOpen(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [handleOutsideClick]);
+    const handler = (e: MouseEvent) => handleOutsideClickRef.current(e);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   return (
     <div className="relative" ref={containerRef}>

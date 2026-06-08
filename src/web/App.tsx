@@ -196,7 +196,7 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center h-screen bg-neutral-950">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-[1.5px] border-neutral-800 border-t-neutral-400 rounded-full animate-spin" />
+          <div className="size-6 border-[1.5px] border-neutral-800 border-t-neutral-400 rounded-full animate-spin" />
           <p className="text-xs text-neutral-600 font-mono">Loading diff...</p>
         </div>
       </div>

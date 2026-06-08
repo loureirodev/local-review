@@ -50,7 +50,7 @@ export default function Toolbar({
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60"
+          className="flex items-center justify-center size-8 rounded-md transition-colors text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60"
           title={`${sidebarCollapsed ? "Show" : "Hide"} file list (Ctrl+B)`}
         >
           <SidebarIcon collapsed={sidebarCollapsed} />

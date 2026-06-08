@@ -23,7 +23,7 @@ const GENERATED_FILE_PATTERNS: RegExp[] = [
   /\.map$/,
 ];
 
-export function isGeneratedFile(filePath: string): boolean {
+function isGeneratedFile(filePath: string): boolean {
   return GENERATED_FILE_PATTERNS.some((p) => p.test(filePath));
 }
 

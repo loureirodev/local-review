@@ -68,7 +68,7 @@ export const FileDiffSection = memo(function FileDiffSection({
             hovered.side === "deletions" ? "deletion" : "addition",
           );
         }}
-        className="absolute -left-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-neutral-700/90 hover:bg-neutral-600 text-neutral-300 hover:text-neutral-100 rounded-full flex items-center justify-center text-lg shadow-lg shadow-black/30 z-10 transition-colors border border-neutral-600/50"
+        className="absolute -left-2 top-1/2 -translate-y-1/2 size-6 bg-neutral-700/90 hover:bg-neutral-600 text-neutral-300 hover:text-neutral-100 rounded-full flex items-center justify-center text-lg shadow-lg shadow-black/30 z-10 transition-colors border border-neutral-600/50"
         title="Add comment"
       >
         +

@@ -15,8 +15,7 @@
     "types": ["bun"],
     "paths": {
       "@shared/*": ["./src/shared/*"]
-    },
-    "baseUrl": "."
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
