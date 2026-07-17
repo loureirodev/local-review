@@ -127,7 +127,7 @@ export default function SettingsPopover({
   openRef.current = open;
 
   // Close on outside click — handler stored in ref so the effect registers once
-  const handleOutsideClickRef = useRef<(e: MouseEvent) => void>(null!);
+  const handleOutsideClickRef = useRef<((e: MouseEvent) => void) | null>(null);
   handleOutsideClickRef.current = (e: MouseEvent) => {
     if (
       openRef.current &&
@@ -139,7 +139,11 @@ export default function SettingsPopover({
   };
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => handleOutsideClickRef.current(e);
+    const handler = (e: MouseEvent) => {
+      if (handleOutsideClickRef.current) {
+        handleOutsideClickRef.current(e);
+      }
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
