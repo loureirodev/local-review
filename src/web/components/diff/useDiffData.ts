@@ -45,8 +45,8 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
           fileComments.push(comment);
         } else {
           const side = comment.side === "deletion" ? "deletions" : "additions";
-          const lineSet = side === "deletions" ? visible?.deletions : visible?.additions;
-          if (!lineSet || lineSet.has(comment.line)) {
+          const lineSet = visible?.[side];
+          if (lineSet?.has(comment.line)) {
             fileAnnotations.push({
               side,
               lineNumber: comment.line,

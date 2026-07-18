@@ -170,18 +170,21 @@ export default function FileTree({
     model.setGitStatus(gitEntries);
   }, [gitEntries, reviewFiles, model]);
 
+  const viewedFiles = useMemo(
+    () => Object.keys(reviewFiles).filter((path) => reviewFiles[path].viewed),
+    [reviewFiles],
+  );
+
   // Sync viewed state via a custom style element injected into the shadow root.
   useEffect(() => {
     const container = model.getFileTreeContainer();
     const shadowRoot = container?.shadowRoot;
     if (!shadowRoot) return;
 
-    const rules = Object.entries(reviewFiles)
-      .filter(([, s]) => s.viewed)
-      .map(([path]) => {
-        const escaped = path.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-        return `button[data-item-path="${escaped}"] { opacity: 0.4; }`;
-      });
+    const rules = viewedFiles.map((path) => {
+      const escaped = path.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+      return `button[data-item-path="${escaped}"] { opacity: 0.4; }`;
+    });
 
     let style = shadowRoot.querySelector<HTMLStyleElement>("style[data-viewed-css]");
     if (!style) {
@@ -190,7 +193,7 @@ export default function FileTree({
       shadowRoot.appendChild(style);
     }
     style.textContent = rules.join("\n");
-  }, [reviewFiles, model]);
+  }, [viewedFiles, model]);
 
   // Stamp title=<full-path> on every row button so truncated names show a tooltip.
   // Uses a MutationObserver because the tree is virtualized (rows appear on scroll).

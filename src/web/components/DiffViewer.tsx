@@ -61,6 +61,7 @@ function DiffViewerInner({
   );
 
   const codeViewRef = useRef<CodeViewHandle<CommentAnnotation>>(null);
+  const styleRef = useRef<HTMLStyleElement | null>(null);
 
   const { filesKey, initialItems, collectUpdatedItems } = useCodeViewItems({
     allFileDiffs: allFileDiffs ?? EMPTY_FILE_DIFFS,
@@ -146,13 +147,9 @@ function DiffViewerInner({
     }
   }, [reviewFiles, getIsCollapsed, collectUpdatedItems]);
 
-  // Navigation: scroll to the target file's section. CodeView resolves the
-  // target against its live measured layout, including not-yet-rendered files.
+  // Navigation: scroll to the target file's section and highlight it visually.
   useEffect(() => {
     if (!navigationTargetFile) return;
-    // "smooth-auto": animate for nearby targets, but jump instantly for far
-    // ones (>10 viewports) against the primed/measured destination — avoids the
-    // "stuck then snap" bounce when scrolling to a far, not-yet-measured file.
     codeViewRef.current?.scrollTo({
       type: "item",
       id: navigationTargetFile,
@@ -161,6 +158,25 @@ function DiffViewerInner({
     });
     onNavigationHandled(navigationTargetFile);
   }, [navigationTargetFile, onNavigationHandled]);
+
+  // Highlight the currently navigated file with a background color.
+  useEffect(() => {
+    if (!styleRef.current) {
+      styleRef.current = document.createElement("style");
+      styleRef.current.setAttribute("data-selected-file-css", "");
+      document.head.appendChild(styleRef.current);
+    }
+    if (navigationTargetFile) {
+      const escaped = navigationTargetFile.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+      styleRef.current.textContent = `
+        diffs-container[data-file-id="${escaped}"] {
+          background-color: rgba(59, 130, 246, 0.05);
+        }
+      `;
+    } else {
+      styleRef.current.textContent = "";
+    }
+  }, [navigationTargetFile]);
 
   const renderAnnotation = useCallback(
     (
