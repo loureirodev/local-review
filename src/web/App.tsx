@@ -251,7 +251,6 @@ function AppContent() {
         <ErrorBoundary>
           <DiffViewer
             patch={diffState.patch}
-            selectedFile={selectedFile}
             navigationTargetFile={navigationTargetFile}
             reviewFiles={state.files}
             onNavigationHandled={handleNavigationHandled}

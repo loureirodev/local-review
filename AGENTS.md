@@ -26,7 +26,7 @@ Conventional Commits enforced via `commitlint` + `husky`. Lowercase type, impera
 - **Frontend** — `src/web/` (React 19 + Vite + Tailwind v4)
 - **Shared types** — `src/shared/types.ts` (used by both CLI and web)
 - **Path alias** — `@shared` → `src/shared` (in `vite.config.ts` and `tsconfig.json`)
-- **Diff rendering** — `@pierre/diffs` (Shiki-based)
+- **Diff rendering** — `@pierre/diffs` `CodeView` (Shiki-based; per-line virtualization in a single owned scroll container, imperative `initialItems` + `ref.updateItem`). See `src/web/components/DiffViewer.tsx` + `diff/useCodeViewItems.ts`
 
 ## Dev Proxy
 - Vite (`:5173`) proxies `/api` → CLI server (`:3000`)

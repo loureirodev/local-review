@@ -35,10 +35,9 @@
     "url": "https://github.com/loureirodev/local-review.git"
   },
   "dependencies": {
-    "@pierre/diffs": "^1.1.21",
+    "@pierre/diffs": "^1.2.7",
     "@pierre/trees": "1.0.0-beta.3",
     "@radix-ui/react-dialog": "^1.1.15",
-    "@tanstack/react-virtual": "^3.13.24",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

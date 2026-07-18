@@ -212,26 +212,34 @@ export default function FileTree({
     return () => observer.disconnect();
   }, [model]);
 
-  // Reflect selectedFile → model focus
+  const filePathSet = useMemo(() => new Set(files.map((f) => f.name)), [files]);
+  const selectedPaths = useFileTreeSelection(model);
+  const prevSelectionRef = useRef<readonly string[]>([]);
+  // Fresh read of selectedFile for the navigation guard below (avoids a stale
+  // closure when scroll-driven active tracking updates it).
+  const selectedFileRef = useRef(selectedFile);
+  selectedFileRef.current = selectedFile;
+
+  // Reflect selectedFile → tree highlight. Depends on selectedFile ONLY: it must
+  // NOT run on raw selection changes from a user click (the click sets the
+  // selection first and selectedFile lags by a render) or it would re-focus the
+  // stale selectedFile and undo the click.
   useEffect(() => {
     if (selectedFile) model.focusPath(selectedFile);
   }, [selectedFile, model]);
 
-  // Translate tree selection → parent callback
-  // Only propagate selection for actual diff files — folder paths end with "/"
-  // and would trigger an infinite update loop (useFileTreeSelection returns a
-  // new array reference each render, so the ref-equality guard doesn't help).
-  const filePathSet = useMemo(() => new Set(files.map((f) => f.name)), [files]);
-  const selectedPaths = useFileTreeSelection(model);
-  const prevSelectionRef = useRef<readonly string[]>([]);
+  // Tree selection → navigation. A real click selects a file that differs from
+  // the current selectedFile → navigate. Scroll-driven active tracking sets
+  // selectedFile AND focuses that same file, so its selection echo has
+  // path === selectedFile and is skipped — no scroll→navigate feedback loop.
   useEffect(() => {
     if (selectedPaths === prevSelectionRef.current) return;
     prevSelectionRef.current = selectedPaths;
     const path = selectedPaths[0];
-    if (selectedPaths.length === 1 && path !== selectedFile && filePathSet.has(path)) {
+    if (selectedPaths.length === 1 && path !== selectedFileRef.current && filePathSet.has(path)) {
       onSelectFile(path);
     }
-  }, [selectedPaths, selectedFile, onSelectFile, filePathSet]);
+  }, [selectedPaths, onSelectFile, filePathSet]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     model.setSearch(e.target.value || null);

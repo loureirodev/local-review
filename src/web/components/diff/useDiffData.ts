@@ -3,17 +3,10 @@ import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useMemo } from "react";
 import { compareByTreeOrder } from "../../utils/treeOrder";
-import {
-  type CommentAnnotation,
-  type FileDiffSummary,
-  getVisibleLines,
-  summarizeFileDiff,
-} from "./diffParsing";
+import { type CommentAnnotation, getVisibleLines } from "./diffParsing";
 
 export interface DiffData {
   allFileDiffs: ReturnType<typeof parsePatchFiles>[number]["files"] | null;
-  summaryByFile: Map<string, FileDiffSummary>;
-  totalLines: number;
   lineAnnotationsByFile: Map<string, DiffLineAnnotation<CommentAnnotation>[]>;
   fileLevelCommentsByFile: Map<string, ReviewComment[]>;
 }
@@ -39,21 +32,6 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
     }
     return map;
   }, [allFileDiffs]);
-
-  const summaryByFile = useMemo(() => {
-    const map = new Map<string, FileDiffSummary>();
-    if (!allFileDiffs) return map;
-    for (const fd of allFileDiffs) {
-      map.set(fd.name, summarizeFileDiff(fd));
-    }
-    return map;
-  }, [allFileDiffs]);
-
-  const totalLines = useMemo(() => {
-    let total = 0;
-    for (const summary of summaryByFile.values()) total += summary.lines;
-    return total;
-  }, [summaryByFile]);
 
   const { lineAnnotationsByFile, fileLevelCommentsByFile } = useMemo(() => {
     const annotations = new Map<string, DiffLineAnnotation<CommentAnnotation>[]>();
@@ -87,8 +65,6 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
 
   return {
     allFileDiffs,
-    summaryByFile,
-    totalLines,
     lineAnnotationsByFile,
     fileLevelCommentsByFile,
   };

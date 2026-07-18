@@ -19,8 +19,9 @@ export default function Layout({ sidebar, toolbar, sidebarCollapsed, children }:
           <div className={`w-72 h-full ${sidebarCollapsed ? "invisible" : ""}`}>{sidebar}</div>
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-auto scroll-smooth-y bg-neutral-950">{children}</main>
+        {/* Main content — CodeView owns its own scroll container, so the cell
+            itself must not scroll (avoids a nested double-scroller). */}
+        <main className="flex-1 overflow-hidden bg-neutral-950">{children}</main>
       </div>
     </div>
   );
