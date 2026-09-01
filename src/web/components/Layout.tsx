@@ -19,8 +19,11 @@ export default function Layout({ sidebar, toolbar, sidebarCollapsed, children }:
           <div className={`w-72 h-full ${sidebarCollapsed ? "invisible" : ""}`}>{sidebar}</div>
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-auto scroll-smooth-y bg-neutral-950">{children}</main>
+        {/* Main content — CodeView (@pierre/diffs) owns its own scroll container
+            with overflow-y-auto. The cell must not scroll (overflow-hidden)
+            to avoid nested scrollers. If CodeView initialization fails (CSS not
+            loaded, bundle error), the diff will not be scrollable. */}
+        <main className="flex-1 overflow-hidden bg-neutral-950">{children}</main>
       </div>
     </div>
   );

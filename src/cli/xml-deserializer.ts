@@ -6,7 +6,7 @@ import type {
   FileReviewState,
   ReviewComment,
   ReviewState,
-} from "../shared/types.js";
+} from "../shared/types";
 
 function unescapeXml(str: string): string {
   return str

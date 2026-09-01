@@ -1,7 +1,7 @@
 import type { DiffMode } from "@shared/types.js";
-import { useSettings } from "../hooks/useSettings.js";
-import { BranchIcon, ExportIcon, SidebarIcon } from "./icons.js";
-import SettingsPopover from "./SettingsPopover.js";
+import { useSettings } from "../hooks/useSettings";
+import { BranchIcon, ExportIcon, SidebarIcon } from "./icons";
+import SettingsPopover from "./SettingsPopover";
 
 interface ToolbarProps {
   mode: DiffMode;
@@ -50,7 +50,7 @@ export default function Toolbar({
         <button
           type="button"
           onClick={onToggleSidebar}
-          className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60"
+          className="flex items-center justify-center size-8 rounded-md transition-colors text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60"
           title={`${sidebarCollapsed ? "Show" : "Hide"} file list (Ctrl+B)`}
         >
           <SidebarIcon collapsed={sidebarCollapsed} />
@@ -120,13 +120,11 @@ export default function Toolbar({
           diffStyle={settings.diffStyle}
           wrapLines={settings.wrapLines}
           showLineNumbers={settings.showLineNumbers}
-          nestedTree={settings.nestedTree}
           fontSize={settings.fontSize}
           lineHeight={settings.lineHeight}
           onDiffStyleChange={(v) => actions.update("diffStyle", v)}
           onWrapLinesChange={(v) => actions.update("wrapLines", v)}
           onShowLineNumbersChange={(v) => actions.update("showLineNumbers", v)}
-          onNestedTreeChange={(v) => actions.update("nestedTree", v)}
           onFontSizeChange={(v) => actions.update("fontSize", v)}
           onLineHeightChange={(v) => actions.update("lineHeight", v)}
         />

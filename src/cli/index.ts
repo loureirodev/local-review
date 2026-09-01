@@ -1,10 +1,22 @@
 #!/usr/bin/env bun
 // CLI entry point for local-review
 
-import type { DiffMode } from "../shared/types.js";
-import { isGitRepo } from "./git.js";
-import { openBrowser } from "./open-browser.js";
-import { startServer } from "./server.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { DiffMode } from "../shared/types";
+import { isGitRepo } from "./git";
+import { openBrowser } from "./open-browser";
+import { startServer } from "./server";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let version = "unknown";
+try {
+  const packageJson = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
+  version = packageJson.version;
+} catch {
+  // Fallback if package.json can't be read
+}
 
 function printHelp(): void {
   console.error(
@@ -33,8 +45,7 @@ Examples:
 }
 
 function printVersion(): void {
-  // Use a static version that matches package.json
-  console.error("local-review v0.1.0");
+  console.error(`local-review v${version}`);
 }
 
 function parseArgs(argv: string[]): {

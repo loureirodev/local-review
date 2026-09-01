@@ -10,8 +10,6 @@ import {
   useState,
 } from "react";
 
-const AUTO_COLLAPSE_THRESHOLD = 12;
-
 const GENERATED_FILE_PATTERNS: RegExp[] = [
   /(^|\/)(bun\.lock|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)$/,
   /^dist\//,
@@ -23,7 +21,7 @@ const GENERATED_FILE_PATTERNS: RegExp[] = [
   /\.map$/,
 ];
 
-export function isGeneratedFile(filePath: string): boolean {
+function isGeneratedFile(filePath: string): boolean {
   return GENERATED_FILE_PATTERNS.some((p) => p.test(filePath));
 }
 
@@ -49,9 +47,12 @@ export function CollapseProvider({ filePaths, reviewFiles, children }: ProviderP
   const isCollapsedDefault = useCallback(
     (filePath: string): boolean => {
       if (reviewFiles[filePath]?.viewed) return true;
-      return filePaths.length > AUTO_COLLAPSE_THRESHOLD || isGeneratedFile(filePath);
+      // Files are expanded by default; only viewed and generated files
+      // (lockfiles, build output, etc.) collapse automatically. CodeView
+      // virtualizes per line, so there's no perf reason to collapse on count.
+      return isGeneratedFile(filePath);
     },
-    [filePaths.length, reviewFiles],
+    [reviewFiles],
   );
 
   const getIsCollapsed = useCallback(

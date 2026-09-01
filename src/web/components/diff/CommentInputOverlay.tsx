@@ -1,5 +1,5 @@
 import type { ReviewComment } from "@shared/types.js";
-import CommentInput from "../CommentInput.js";
+import CommentInput from "../CommentInput";
 
 export interface ActiveInput {
   filePath: string;

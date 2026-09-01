@@ -128,24 +128,6 @@ export function LineNumbersIcon() {
   );
 }
 
-export function TreeIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 2v12M3 5h3M3 9h3M6 9v3h3" />
-    </svg>
-  );
-}
-
 export function FontSizeIcon() {
   return (
     <svg
@@ -226,23 +208,6 @@ export function ExportIcon() {
   );
 }
 
-export function CheckIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      width="10"
-      height="10"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M2.5 6l2.5 2.5 4.5-4.5" />
-    </svg>
-  );
-}
-
 export function CloseIcon({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -282,25 +247,6 @@ export function SidebarIcon({ collapsed }: { collapsed: boolean }) {
           <line x1="3" y1="8" x2="4.5" y2="8" opacity="0.5" />
         </>
       )}
-    </svg>
-  );
-}
-
-export function ChevronIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
-    >
-      <path d="M4 2l4 4-4 4" />
     </svg>
   );
 }
@@ -386,33 +332,6 @@ export function PencilIcon() {
     >
       <path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z" />
       <line x1="9.5" y1="3.5" x2="12.5" y2="6.5" />
-    </svg>
-  );
-}
-
-export function FolderIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={open ? "text-blue-400/80" : "text-neutral-500"}
-    >
-      {open ? (
-        <path d="M2 4v8a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3.5A1 1 0 005.8 3H3a1 1 0 00-1 1z" />
-      ) : (
-        <path
-          d="M2 4v8a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1H8L6.5 3.5A1 1 0 005.8 3H3a1 1 0 00-1 1z"
-          fill="currentColor"
-          fillOpacity="0.15"
-        />
-      )}
     </svg>
   );
 }

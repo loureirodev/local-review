@@ -19,7 +19,6 @@ export interface DisplaySettings {
   diffStyle: "split" | "unified";
   wrapLines: boolean;
   showLineNumbers: boolean;
-  nestedTree: boolean;
   fontSize: number;
   lineHeight: number;
 }
@@ -28,7 +27,6 @@ const defaults: DisplaySettings = {
   diffStyle: "split",
   wrapLines: true,
   showLineNumbers: true,
-  nestedTree: false,
   fontSize: 13,
   lineHeight: 20,
 };

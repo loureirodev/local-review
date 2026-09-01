@@ -41,7 +41,7 @@ export interface ReviewState {
 
 // ===== API Types =====
 
-export interface RepoInfo {
+interface RepoInfo {
   branch: string;
   baseBranch: string;
   repoRoot: string;

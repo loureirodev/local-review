@@ -6,7 +6,10 @@ export function HeaderChevron({ collapsed, onClick }: { collapsed: boolean; onCl
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       title={collapsed ? "Expand file" : "Collapse file"}
       aria-label={collapsed ? "Expand file" : "Collapse file"}
       aria-pressed={collapsed}

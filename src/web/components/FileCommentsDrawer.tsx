@@ -1,9 +1,9 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { DiffSource, ReviewComment } from "@shared/types.js";
-import { useCallback, useState } from "react";
-import CommentDisplay from "./CommentDisplay.js";
-import CommentInput from "./CommentInput.js";
-import { CloseIcon } from "./icons.js";
+import { useCallback, useRef, useState } from "react";
+import CommentDisplay from "./CommentDisplay";
+import CommentInput from "./CommentInput";
+import { CloseIcon } from "./icons";
 
 interface FileCommentsDrawerProps {
   filePath: string | null;
@@ -38,9 +38,9 @@ export default function FileCommentsDrawer({
   );
 
   // Sync inputVisible when showInput prop changes (drawer reopened with "+" click)
-  const [prevShowInput, setPrevShowInput] = useState(showInput);
-  if (showInput !== prevShowInput) {
-    setPrevShowInput(showInput);
+  const prevShowInputRef = useRef(showInput);
+  if (showInput !== prevShowInputRef.current) {
+    prevShowInputRef.current = showInput;
     if (showInput) setInputVisible(true);
   }
 
@@ -65,7 +65,7 @@ export default function FileCommentsDrawer({
                     className="p-1 text-neutral-500 hover:text-neutral-300 transition-colors rounded"
                     title="Close"
                   >
-                    <CloseIcon className="w-4 h-4" />
+                    <CloseIcon className="size-4" />
                   </button>
                 </Dialog.Close>
               </div>
@@ -76,7 +76,7 @@ export default function FileCommentsDrawer({
               </div>
 
               {/* Comments list */}
-              <div className="flex-1 overflow-y-auto px-2 py-2">
+              <div className="flex-1 overflow-y-auto p-2">
                 {comments.length === 0 && !inputVisible ? (
                   <div className="text-center py-8 text-neutral-600 text-[13px] font-mono">
                     No file-level comments yet

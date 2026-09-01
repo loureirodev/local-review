@@ -1,15 +1,15 @@
+import type { GitStatusEntry } from "@pierre/trees";
+import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react";
 import type { FileReviewState } from "@shared/types.js";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { useCollapse } from "../context/CollapseContext.js";
-import { useSettings } from "../hooks/useSettings.js";
-import { CheckIcon, ChevronIcon, FolderIcon } from "./icons.js";
+import { useEffect, useMemo, useRef } from "react";
+import { useCollapse } from "../context/CollapseContext";
+import { useSettings } from "../hooks/useSettings";
 
 interface FileTreeProps {
   files: FileInfo[];
   reviewFiles: Record<string, FileReviewState>;
   selectedFile: string | null;
   onSelectFile: (filePath: string) => void;
-  onToggleViewed: (filePath: string) => void;
 }
 
 export interface FileInfo {
@@ -17,253 +17,74 @@ export interface FileInfo {
   type: "new" | "deleted" | "renamed" | "renamed-changed" | "change";
 }
 
-const typeColors: Record<FileInfo["type"], { active: string; muted: string }> = {
-  new: { active: "text-green-400/80", muted: "text-green-400/30" },
-  deleted: { active: "text-red-400/80", muted: "text-red-400/30" },
-  renamed: { active: "text-blue-400/80", muted: "text-blue-400/30" },
-  "renamed-changed": { active: "text-blue-400/80", muted: "text-blue-400/30" },
-  change: { active: "text-yellow-400/80", muted: "text-yellow-400/30" },
+const FILE_TYPE_TO_GIT_STATUS: Record<FileInfo["type"], GitStatusEntry["status"]> = {
+  new: "untracked",
+  deleted: "deleted",
+  renamed: "renamed",
+  "renamed-changed": "renamed",
+  change: "modified",
 };
 
-const typeLabels: Record<FileInfo["type"], string> = {
-  new: "A",
-  deleted: "D",
-  renamed: "R",
-  "renamed-changed": "R",
-  change: "M",
-};
+const FONT_FAMILY =
+  "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
 
-/* ── Tree node types ── */
+const TREE_STYLE_BASE = {
+  flex: 1,
+  minHeight: 0,
+  "--trees-bg-override": "transparent",
+  "--trees-fg-override": "#d4d4d4",
+  "--trees-theme-list-hover-bg": "rgba(38,38,38,0.5)",
+  "--trees-selected-bg-override": "rgba(38,38,38,0.7)",
+  "--trees-selected-fg-override": "#f5f5f5",
+  "--trees-status-untracked-override": "rgba(74,222,128,0.8)",
+  "--trees-status-added-override": "rgba(74,222,128,0.8)",
+  "--trees-status-deleted-override": "rgba(248,113,113,0.8)",
+  "--trees-status-modified-override": "rgba(250,204,21,0.8)",
+  "--trees-status-renamed-override": "rgba(96,165,250,0.8)",
+  "--trees-padding-inline-override": "8px",
+  "--trees-font-family-override": FONT_FAMILY,
+} as React.CSSProperties;
 
-interface TreeNode {
-  name: string; // segment name (folder or filename)
-  fullPath: string; // complete path for folders, or file path for leaves
-  children: TreeNode[];
-  file: FileInfo | null; // non-null for leaf nodes
-}
-
-export function compareByTreeOrder(a: string, b: string): number {
-  const pa = a.split("/");
-  const pb = b.split("/");
-  const len = Math.min(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const lastA = i === pa.length - 1;
-    const lastB = i === pb.length - 1;
-    if (lastA !== lastB) return lastA ? 1 : -1; // folder before file
-    const cmp = pa[i].localeCompare(pb[i]);
-    if (cmp !== 0) return cmp;
-  }
-  return pa.length - pb.length;
-}
-
-function buildTree(files: FileInfo[]): TreeNode[] {
-  const root: TreeNode = { name: "", fullPath: "", children: [], file: null };
-
-  for (const file of files) {
-    const parts = file.name.split("/");
-    let current = root;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isFile = i === parts.length - 1;
-      const pathSoFar = parts.slice(0, i + 1).join("/");
-
-      if (isFile) {
-        current.children.push({
-          name: part,
-          fullPath: file.name,
-          children: [],
-          file,
-        });
-      } else {
-        let folder = current.children.find((c) => c.file === null && c.name === part);
-        if (!folder) {
-          folder = { name: part, fullPath: pathSoFar, children: [], file: null };
-          current.children.push(folder);
-        }
-        current = folder;
-      }
-    }
+// Injected once into the shadow root via unsafeCSS (higher specificity than base layer).
+const UNSAFE_CSS = `
+  :host {
+    color-scheme: dark;
   }
 
-  // Sort: folders first, then files, both alphabetically
-  function sortNodes(nodes: TreeNode[]) {
-    nodes.sort((a, b) => {
-      if (a.file && !b.file) return 1;
-      if (!a.file && b.file) return -1;
-      return a.name.localeCompare(b.name);
-    });
-    for (const n of nodes) {
-      if (n.children.length > 0) sortNodes(n.children);
-    }
-  }
-  sortNodes(root.children);
-
-  return root.children;
-}
-
-/* ── File Row (shared between flat and nested) ── */
-
-const FileRow = memo(function FileRow({
-  file,
-  displayName,
-  isSelected,
-  isViewed,
-  commentCount,
-  depth,
-  onSelectFile,
-  onToggleViewed,
-}: {
-  file: FileInfo;
-  displayName: string;
-  isSelected: boolean;
-  isViewed: boolean;
-  commentCount: number;
-  depth: number;
-  onSelectFile: (path: string) => void;
-  onToggleViewed: (path: string) => void;
-}) {
-  const handleViewedClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onToggleViewed(file.name);
-  };
-
-  const handleViewedKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === " " || e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-      onToggleViewed(file.name);
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelectFile(file.name)}
-      className={`group w-full text-left py-1 pr-2 text-[13px] flex items-center gap-1.5 transition-colors ${
-        isSelected
-          ? "bg-neutral-800/70 text-neutral-100"
-          : isViewed
-            ? "hover:bg-neutral-800/30"
-            : "hover:bg-neutral-800/50"
-      }`}
-      style={{ paddingLeft: `${8 + depth * 16}px` }}
-    >
-      {/* Viewed indicator */}
-      {/* biome-ignore lint/a11y/useSemanticElements: interactive checkbox nested inside button requires span */}
-      <span
-        role="checkbox"
-        aria-checked={isViewed}
-        aria-label="Mark as viewed"
-        tabIndex={-1}
-        onClick={handleViewedClick}
-        onKeyDown={handleViewedKeyDown}
-        className={`flex-shrink-0 w-3.5 h-3.5 rounded-full flex items-center justify-center cursor-pointer transition-all ${
-          isViewed
-            ? "bg-green-500/20 text-green-400/80"
-            : "border border-neutral-700 group-hover:border-neutral-500"
-        }`}
-      >
-        {isViewed ? <CheckIcon className="w-2.5 h-2.5" /> : null}
-      </span>
-
-      {/* Change type badge */}
-      <span
-        className={`flex-shrink-0 text-[11px] font-mono font-semibold w-3 text-center ${typeColors[file.type][isViewed ? "muted" : "active"]}`}
-      >
-        {typeLabels[file.type]}
-      </span>
-
-      {/* File name */}
-      <span
-        className={`truncate font-mono transition-colors ${isViewed ? "text-neutral-600" : "text-neutral-300"}`}
-        title={file.name}
-      >
-        {displayName}
-      </span>
-
-      {/* Comment count */}
-      {commentCount > 0 ? (
-        <span
-          className={`ml-auto flex-shrink-0 text-[10px] rounded-full px-1.5 py-px font-mono font-medium ${isViewed ? "bg-neutral-800/60 text-neutral-500" : "bg-neutral-800 text-neutral-400"}`}
-        >
-          {commentCount}
-        </span>
-      ) : null}
-    </button>
-  );
-});
-
-/* ── Nested Tree Node ── */
-
-const TreeNodeRow = memo(function TreeNodeRow({
-  node,
-  depth,
-  expandedDirs,
-  toggleDir,
-  selectedFile,
-  reviewFiles,
-  onSelectFile,
-  onToggleViewed,
-}: {
-  node: TreeNode;
-  depth: number;
-  expandedDirs: Set<string>;
-  toggleDir: (path: string) => void;
-  selectedFile: string | null;
-  reviewFiles: Record<string, FileReviewState>;
-  onSelectFile: (path: string) => void;
-  onToggleViewed: (path: string) => void;
-}) {
-  if (node.file) {
-    const file = node.file;
-    const isViewed = reviewFiles[file.name]?.viewed ?? false;
-    const commentCount = reviewFiles[file.name]?.comments.length ?? 0;
-    return (
-      <FileRow
-        file={file}
-        displayName={node.name}
-        isSelected={selectedFile === file.name}
-        isViewed={isViewed}
-        commentCount={commentCount}
-        depth={depth}
-        onSelectFile={onSelectFile}
-        onToggleViewed={onToggleViewed}
-      />
-    );
+  /* Fix truncation ellipsis: without color-scheme the light-dark() fallback is
+     transparent, so the … marker overlaps the clipped text instead of covering it. */
+  [data-truncate-container] {
+    --truncate-marker-background-color: rgb(10, 10, 10);
   }
 
-  const isExpanded = expandedDirs.has(node.fullPath);
+  /* Hide the M/U/D/R git letter — the filename color already conveys the status. */
+  [data-item-section='git'] {
+    display: none;
+  }
 
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => toggleDir(node.fullPath)}
-        className="w-full text-left py-0.5 pr-2 text-[13px] flex items-center gap-1 hover:bg-neutral-800/50 transition-colors text-neutral-400"
-        style={{ paddingLeft: `${8 + depth * 16}px` }}
-      >
-        <ChevronIcon expanded={isExpanded} />
-        <FolderIcon open={isExpanded} />
-        <span className="truncate font-mono text-neutral-400">{node.name}</span>
-      </button>
-      {isExpanded
-        ? node.children.map((child) => (
-            <TreeNodeRow
-              key={child.fullPath}
-              node={child}
-              depth={depth + 1}
-              expandedDirs={expandedDirs}
-              toggleDir={toggleDir}
-              selectedFile={selectedFile}
-              reviewFiles={reviewFiles}
-              onSelectFile={onSelectFile}
-              onToggleViewed={onToggleViewed}
-            />
-          ))
-        : null}
-    </>
-  );
-});
+  /* When a badge is present, reserve enough width so it's never crushed by a long
+     filename. The section keeps flex: 1 1 0 (spacer) so items stay right-aligned;
+     min-width only kicks in when there is a child span. */
+  [data-item-section='decoration']:has(> span) {
+    min-width: 24px;
+  }
+
+  [data-item-section='decoration'] > span {
+    background-color: rgba(79, 70, 229, 0.2);
+    color: rgba(165, 180, 252, 0.85);
+    border-radius: 999px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    box-sizing: border-box;
+    align-self: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+`;
 
 /* ── Footer ── */
 
@@ -304,54 +125,139 @@ export default function FileTree({
   reviewFiles,
   selectedFile,
   onSelectFile,
-  onToggleViewed,
 }: FileTreeProps) {
-  const {
-    state: { nestedTree: nested },
-  } = useSettings();
-  const [filter, setFilter] = useState("");
+  const { state: settings } = useSettings();
+  const reviewFilesRef = useRef(reviewFiles);
+  reviewFilesRef.current = reviewFiles;
 
-  // Expanded dirs state — all expanded by default
-  const allDirPaths = useMemo(() => {
-    const dirs = new Set<string>();
-    for (const file of files) {
-      const parts = file.name.split("/");
-      for (let i = 1; i < parts.length; i++) {
-        dirs.add(parts.slice(0, i).join("/"));
-      }
-    }
-    return dirs;
-  }, [files]);
+  const treeStyle = useMemo(
+    () =>
+      ({
+        ...TREE_STYLE_BASE,
+        "--trees-font-size-override": `${settings.fontSize}px`,
+      }) as React.CSSProperties,
+    [settings.fontSize],
+  );
 
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set(allDirPaths));
+  const { model } = useFileTree({
+    paths: files.map((f) => f.name),
+    initialExpansion: "open",
+    unsafeCSS: UNSAFE_CSS,
+    renderRowDecoration: ({ item }) => {
+      if (item.kind !== "file") return null;
+      const count = reviewFilesRef.current[item.path]?.comments.length ?? 0;
+      return count > 0
+        ? { text: String(count), title: `${count} comment${count !== 1 ? "s" : ""}` }
+        : null;
+    },
+  });
 
-  // Sync expanded dirs when files change
+  // Sync paths when files change
   useEffect(() => {
-    setExpandedDirs((prev) => {
-      const merged = new Set(prev);
-      for (const d of allDirPaths) merged.add(d);
-      return merged;
+    model.resetPaths(files.map((f) => f.name));
+  }, [files, model]);
+
+  // Sync git status. Derives only from the file list.
+  const gitEntries = useMemo<GitStatusEntry[]>(
+    () => files.map((f) => ({ path: f.name, status: FILE_TYPE_TO_GIT_STATUS[f.type] })),
+    [files],
+  );
+  useEffect(() => {
+    model.setGitStatus(gitEntries);
+  }, [gitEntries, model]);
+
+  // Refresh the comment-count decorations. `renderRowDecoration` reads live data
+  // from a ref, so the tree has to be told to re-render when the counts change.
+  // @pierre/trees exposes no "invalidate decorations" call, and `setComposition`
+  // is the only public method that re-renders unconditionally — so round-trip the
+  // current composition, which changes no state.
+  //
+  // This used to ride on `setGitStatus`, which re-rendered on every call. Since
+  // 1.0.0-beta.4 it early-returns when the resolved status is unchanged, which it
+  // always is here (it derives from `files`, not from comments), so the badges
+  // silently stopped updating.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles is the change trigger; the decoration renderer reads it through a ref
+  useEffect(() => {
+    model.setComposition(model.getComposition());
+  }, [reviewFiles, model]);
+
+  const viewedFiles = useMemo(
+    () => Object.keys(reviewFiles).filter((path) => reviewFiles[path].viewed),
+    [reviewFiles],
+  );
+
+  // Sync viewed state via a custom style element injected into the shadow root.
+  useEffect(() => {
+    const container = model.getFileTreeContainer();
+    const shadowRoot = container?.shadowRoot;
+    if (!shadowRoot) return;
+
+    const rules = viewedFiles.map((path) => {
+      const escaped = path.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+      return `button[data-item-path="${escaped}"] { opacity: 0.4; }`;
     });
-  }, [allDirPaths]);
 
-  const toggleDir = useCallback((path: string) => {
-    setExpandedDirs((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }, []);
+    let style = shadowRoot.querySelector<HTMLStyleElement>("style[data-viewed-css]");
+    if (!style) {
+      style = document.createElement("style");
+      style.setAttribute("data-viewed-css", "");
+      shadowRoot.appendChild(style);
+    }
+    style.textContent = rules.join("\n");
+  }, [viewedFiles, model]);
 
-  const filteredFiles = useMemo(() => {
-    if (!filter) return files;
-    const lower = filter.toLowerCase();
-    return files.filter((f) => f.name.toLowerCase().includes(lower));
-  }, [files, filter]);
+  // Stamp title=<full-path> on every row button so truncated names show a tooltip.
+  // Uses a MutationObserver because the tree is virtualized (rows appear on scroll).
+  useEffect(() => {
+    const container = model.getFileTreeContainer();
+    const shadowRoot = container?.shadowRoot;
+    if (!shadowRoot) return;
 
-  const treeNodes = useMemo(() => {
-    return nested ? buildTree(filteredFiles) : [];
-  }, [nested, filteredFiles]);
+    const stamp = () => {
+      for (const btn of shadowRoot.querySelectorAll<HTMLElement>(
+        "button[data-item-path]:not([title])",
+      )) {
+        btn.title = btn.dataset.itemPath ?? "";
+      }
+    };
+    stamp();
+    const observer = new MutationObserver(stamp);
+    observer.observe(shadowRoot, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [model]);
+
+  const filePathSet = useMemo(() => new Set(files.map((f) => f.name)), [files]);
+  const selectedPaths = useFileTreeSelection(model);
+  const prevSelectionRef = useRef<readonly string[]>([]);
+  // Fresh read of selectedFile for the navigation guard below (avoids a stale
+  // closure when scroll-driven active tracking updates it).
+  const selectedFileRef = useRef(selectedFile);
+  selectedFileRef.current = selectedFile;
+
+  // Reflect selectedFile → tree highlight. Depends on selectedFile ONLY: it must
+  // NOT run on raw selection changes from a user click (the click sets the
+  // selection first and selectedFile lags by a render) or it would re-focus the
+  // stale selectedFile and undo the click.
+  useEffect(() => {
+    if (selectedFile) model.focusPath(selectedFile);
+  }, [selectedFile, model]);
+
+  // Tree selection → navigation. A real click selects a file that differs from
+  // the current selectedFile → navigate. Scroll-driven active tracking sets
+  // selectedFile AND focuses that same file, so its selection echo has
+  // path === selectedFile and is skipped — no scroll→navigate feedback loop.
+  useEffect(() => {
+    if (selectedPaths === prevSelectionRef.current) return;
+    prevSelectionRef.current = selectedPaths;
+    const path = selectedPaths[0];
+    if (selectedPaths.length === 1 && path !== selectedFileRef.current && filePathSet.has(path)) {
+      onSelectFile(path);
+    }
+  }, [selectedPaths, onSelectFile, filePathSet]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    model.setSearch(e.target.value || null);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -360,47 +266,13 @@ export default function FileTree({
         <input
           type="text"
           placeholder="Filter files..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={handleSearchChange}
           className="w-full px-2 py-1 text-[13px] font-mono bg-neutral-900/60 border border-neutral-800/60 rounded-md focus:outline-none focus:border-neutral-600 text-neutral-200 placeholder-neutral-600 transition-colors"
         />
       </div>
 
-      {/* File list */}
-      <div className="flex-1 overflow-y-auto scroll-smooth-y">
-        {nested
-          ? treeNodes.map((node) => (
-              <TreeNodeRow
-                key={node.fullPath}
-                node={node}
-                depth={0}
-                expandedDirs={expandedDirs}
-                toggleDir={toggleDir}
-                selectedFile={selectedFile}
-                reviewFiles={reviewFiles}
-                onSelectFile={onSelectFile}
-                onToggleViewed={onToggleViewed}
-              />
-            ))
-          : filteredFiles.map((file) => {
-              const isViewed = reviewFiles[file.name]?.viewed ?? false;
-              const commentCount = reviewFiles[file.name]?.comments.length ?? 0;
-
-              return (
-                <FileRow
-                  key={file.name}
-                  file={file}
-                  displayName={file.name}
-                  isSelected={selectedFile === file.name}
-                  isViewed={isViewed}
-                  commentCount={commentCount}
-                  depth={0}
-                  onSelectFile={onSelectFile}
-                  onToggleViewed={onToggleViewed}
-                />
-              );
-            })}
-      </div>
+      {/* Tree */}
+      <PierreFileTree model={model} style={treeStyle} />
 
       <CollapseFooter />
     </div>
