@@ -157,18 +157,29 @@ export default function FileTree({
     model.resetPaths(files.map((f) => f.name));
   }, [files, model]);
 
-  // Sync git status. Also re-runs on reviewFiles changes so the Preact tree
-  // re-renders and picks up updated renderRowDecoration outputs (comment counts).
+  // Sync git status. Derives only from the file list.
   const gitEntries = useMemo<GitStatusEntry[]>(
     () => files.map((f) => ({ path: f.name, status: FILE_TYPE_TO_GIT_STATUS[f.type] })),
     [files],
   );
-  // reviewFiles in deps is an intentional re-render trigger: when comments change
-  // the Preact tree re-renders and calls renderRowDecoration with fresh data.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles triggers re-render
   useEffect(() => {
     model.setGitStatus(gitEntries);
-  }, [gitEntries, reviewFiles, model]);
+  }, [gitEntries, model]);
+
+  // Refresh the comment-count decorations. `renderRowDecoration` reads live data
+  // from a ref, so the tree has to be told to re-render when the counts change.
+  // @pierre/trees exposes no "invalidate decorations" call, and `setComposition`
+  // is the only public method that re-renders unconditionally — so round-trip the
+  // current composition, which changes no state.
+  //
+  // This used to ride on `setGitStatus`, which re-rendered on every call. Since
+  // 1.0.0-beta.4 it early-returns when the resolved status is unchanged, which it
+  // always is here (it derives from `files`, not from comments), so the badges
+  // silently stopped updating.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles is the change trigger; the decoration renderer reads it through a ref
+  useEffect(() => {
+    model.setComposition(model.getComposition());
+  }, [reviewFiles, model]);
 
   const viewedFiles = useMemo(
     () => Object.keys(reviewFiles).filter((path) => reviewFiles[path].viewed),

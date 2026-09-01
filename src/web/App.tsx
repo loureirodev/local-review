@@ -192,7 +192,11 @@ function AppContent() {
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
 
-  if (async.loading) {
+  // Full-screen loader only while there is nothing to show yet. On a reload the
+  // UI stays mounted so the viewer reconciles the new file set in place and the
+  // reader keeps their scroll position (D8) — unmounting here would rebuild the
+  // whole tree and send them back to the top.
+  if (async.loading && !diffState.patch) {
     return (
       <div className="flex items-center justify-center h-screen bg-neutral-950">
         <div className="flex flex-col items-center gap-3">
@@ -251,6 +255,7 @@ function AppContent() {
         <ErrorBoundary>
           <DiffViewer
             patch={diffState.patch}
+            diffKey={`${diffState.mode}:${diffState.branch}:${diffState.baseBranch}`}
             navigationTargetFile={navigationTargetFile}
             reviewFiles={state.files}
             onNavigationHandled={handleNavigationHandled}

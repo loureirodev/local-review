@@ -15,15 +15,21 @@ interface UseCodeViewItemsParams {
 }
 
 export interface CodeViewItemsResult {
-  /** Stable key that changes when the file set changes, so the consumer can
-   *  remount `<CodeView>` with fresh `initialItems` (imperative mode owns the
-   *  list and the handle exposes no `setItems`/`removeItem`). */
+  /** Changes when the file set changes (membership or order), signalling that
+   *  a targeted `updateItem` pass is no longer enough and the viewer needs a
+   *  full `setItems` reconcile. See D8 in design.md. */
   filesKey: string;
-  /** Items to seed the viewer once via `initialItems`. Recomputed on remount. */
+  /** Items to seed the viewer once via `initialItems`. */
   initialItems: DiffCodeViewItem[];
   /** Return the full items whose render signature changed since the last call,
    *  bumping each one's monotonic `version`. Drives `ref.updateItem`. */
   collectUpdatedItems: () => DiffCodeViewItem[];
+  /** Return the complete ordered item list, bumping the `version` of any item
+   *  whose signature changed and dropping bookkeeping for removed files.
+   *  Drives `setItems`, which reconciles by id: records for surviving files are
+   *  reused (keeping their measured height) and only items with a new `version`
+   *  are re-rendered. */
+  buildAllItems: () => DiffCodeViewItem[];
 }
 
 function hashString(value: string): string {
@@ -38,9 +44,56 @@ function commentSig(comment: ReviewComment): string {
   return `${comment.id}:${comment.edited ? 1 : 0}:${comment.line}:${comment.side}:${hashString(comment.body)}`;
 }
 
-interface VersionEntry {
+export interface VersionEntry {
   sig: string;
   n: number;
+}
+
+export type VersionMap = Map<string, VersionEntry>;
+
+/**
+ * Track ids not seen before at version 0, leaving existing entries untouched.
+ * Mutates `versions` and returns the version to emit for each id.
+ *
+ * Additive on purpose: overwriting a tracked entry's signature with the current
+ * one would make the next reconcile compare a signature against itself and skip
+ * the bump, so an edited file would keep rendering its stale contents.
+ */
+export function seedMissingVersions(
+  orderedIds: readonly string[],
+  computeSig: (id: string) => string,
+  versions: VersionMap,
+): number[] {
+  return orderedIds.map((id) => {
+    let entry = versions.get(id);
+    if (entry == null) {
+      entry = { sig: computeSig(id), n: 0 };
+      versions.set(id, entry);
+    }
+    return entry.n;
+  });
+}
+
+/**
+ * Build the next version map for a full reconcile: ids keep their version when
+ * their signature is unchanged (so the viewer reuses the record and its
+ * measured height), get a bump when it changed, start at 0 when new, and are
+ * dropped when the file is gone.
+ */
+export function nextVersionMap(
+  orderedIds: readonly string[],
+  computeSig: (id: string) => string,
+  previous: ReadonlyMap<string, VersionEntry>,
+): { versions: VersionMap; emitted: number[] } {
+  const versions: VersionMap = new Map();
+  const emitted = orderedIds.map((id) => {
+    const sig = computeSig(id);
+    const entry = previous.get(id);
+    const n = entry == null ? 0 : entry.sig === sig ? entry.n : entry.n + 1;
+    versions.set(id, { sig, n });
+    return n;
+  });
+  return { versions, emitted };
 }
 
 /**
@@ -83,7 +136,7 @@ export function useCodeViewItems({
     getIsCollapsed,
   };
 
-  const versionRef = useRef<Map<string, VersionEntry>>(new Map());
+  const versionRef = useRef<VersionMap>(new Map());
 
   const computeSig = useCallback((id: string): string => {
     const {
@@ -109,8 +162,11 @@ export function useCodeViewItems({
       for (const comment of fileComments) parts.push(commentSig(comment));
     }
 
+    // Content identity: the git blob ids from the patch's `index` line pin the
+    // exact before/after contents. Line counts are the fallback for patches
+    // without them — hunk count alone missed edits that reshape a hunk in place.
     const fileDiffSig = fileDiff
-      ? `${fileDiff.name}:${fileDiff.type}:${fileDiff.hunks.length}`
+      ? `${fileDiff.name}:${fileDiff.type}:${fileDiff.prevObjectId ?? "-"}:${fileDiff.newObjectId ?? "-"}:${fileDiff.hunks.length}:${fileDiff.unifiedLineCount}:${fileDiff.splitLineCount}`
       : "none";
     return `${collapsed}|${viewed}|${fileDiffSig}|${parts.join(",")}`;
   }, []);
@@ -133,18 +189,23 @@ export function useCodeViewItems({
     };
   }, []);
 
-  // Seed initialItems and reset the version map whenever the file set changes
-  // (remount). Each item starts at version 0 with its current signature.
+  // Seed for the viewer's `initialItems`. Only consumed when `<CodeView>`
+  // mounts, but recomputed whenever the files change so a remount (new
+  // `diffKey`) always seeds from current data.
+  //
+  // Version bookkeeping here is deliberately *additive*: ids already tracked
+  // keep their stored `{ sig, n }` untouched. Resetting the map instead would
+  // overwrite each entry's signature with the current one, so the later
+  // reconcile would compare a signature against itself and never bump the
+  // version — leaving edited files rendering their stale contents.
   const initialItems = useMemo(() => {
-    const versions = new Map<string, VersionEntry>();
+    const ids = allFileDiffs.map((fd) => fd.name);
+    const versions = seedMissingVersions(ids, computeSig, versionRef.current);
     const items: DiffCodeViewItem[] = [];
-    for (const fileDiff of allFileDiffs) {
-      const id = fileDiff.name;
-      versions.set(id, { sig: computeSig(id), n: 0 });
-      const item = buildItem(id, 0);
+    ids.forEach((id, index) => {
+      const item = buildItem(id, versions[index] ?? 0);
       if (item) items.push(item);
-    }
-    versionRef.current = versions;
+    });
     return items;
   }, [allFileDiffs, computeSig, buildItem]);
 
@@ -162,5 +223,19 @@ export function useCodeViewItems({
     return updated;
   }, [computeSig, buildItem]);
 
-  return { filesKey, initialItems, collectUpdatedItems };
+  const buildAllItems = useCallback((): DiffCodeViewItem[] => {
+    // `fileDiffById` is insertion-ordered, so this walks the files in tree
+    // order — the order `setItems` will apply.
+    const ids = [...latest.current.fileDiffById.keys()];
+    const { versions, emitted } = nextVersionMap(ids, computeSig, versionRef.current);
+    const items: DiffCodeViewItem[] = [];
+    ids.forEach((id, index) => {
+      const item = buildItem(id, emitted[index] ?? 0);
+      if (item) items.push(item);
+    });
+    versionRef.current = versions;
+    return items;
+  }, [computeSig, buildItem]);
+
+  return { filesKey, initialItems, collectUpdatedItems, buildAllItems };
 }

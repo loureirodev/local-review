@@ -1,7 +1,7 @@
 // Bun HTTP server: serves the frontend and exposes the API
 
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 import type { DiffMode, DiffResponse, ReviewState } from "../shared/types";
 import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
 import { deserializeReview } from "./xml-deserializer";
@@ -171,6 +171,13 @@ export function startServer(opts: ServerOptions): number {
         return new Response(file, {
           headers: { "Content-Type": getMimeType(filePath) },
         });
+      }
+
+      // Missing asset requests must 404 - serving index.html here yields a blank
+      // page (the browser parses HTML as JS/CSS) when a cached index references
+      // stale asset hashes.
+      if (extname(pathname) !== "") {
+        return new Response("Not Found", { status: 404 });
       }
 
       // SPA fallback: serve index.html for any non-file path
