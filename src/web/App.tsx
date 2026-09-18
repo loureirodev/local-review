@@ -1,6 +1,7 @@
 import { parsePatchFiles } from "@pierre/diffs";
 import type { DiffMode, ReviewState } from "@shared/types.js";
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { Button } from "./components/Button";
 import DiffViewer from "./components/DiffViewer";
 import ErrorBoundary from "./components/ErrorBoundary";
 import FileTree, { type FileInfo } from "./components/FileTree";
@@ -192,16 +193,14 @@ function AppContent() {
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
 
-  // Full-screen loader only while there is nothing to show yet. On a reload the
-  // UI stays mounted so the viewer reconciles the new file set in place and the
-  // reader keeps their scroll position (D8) — unmounting here would rebuild the
-  // whole tree and send them back to the top.
+  // Full-screen loader only while there is nothing to show yet: on a reload the
+  // UI stays mounted so the reader keeps their scroll position.
   if (async.loading && !diffState.patch) {
     return (
-      <div className="flex items-center justify-center h-screen bg-neutral-950">
+      <div className="flex items-center justify-center h-screen bg-bg">
         <div className="flex flex-col items-center gap-3">
-          <div className="size-6 border-[1.5px] border-neutral-800 border-t-neutral-400 rounded-full animate-spin" />
-          <p className="text-xs text-neutral-600 font-mono">Loading diff...</p>
+          <div className="size-6 border-[1.5px] border-hair border-t-accent rounded-full animate-spin" />
+          <p className="text-xs text-muted">Loading diff...</p>
         </div>
       </div>
     );
@@ -209,17 +208,13 @@ function AppContent() {
 
   if (async.error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-neutral-950">
+      <div className="flex items-center justify-center h-screen bg-bg">
         <div className="text-center max-w-md">
-          <p className="text-red-400/80 text-sm font-medium">Error</p>
-          <p className="text-neutral-500 text-xs mt-2 font-mono">{async.error}</p>
-          <button
-            type="button"
-            onClick={loadDiff}
-            className="mt-4 px-3 py-1.5 text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-md transition-colors"
-          >
-            Retry
-          </button>
+          <p className="text-danger text-sm font-medium">Error</p>
+          <p className="text-muted text-xs mt-2">{async.error}</p>
+          <div className="mt-4">
+            <Button onClick={loadDiff}>Retry</Button>
+          </div>
         </div>
       </div>
     );

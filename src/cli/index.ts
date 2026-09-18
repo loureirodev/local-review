@@ -31,6 +31,8 @@ Options:
   --output-file <file> Output file for review XML (default: ./review.xml)
   --existing           Load existing review XML on startup (uses --output-file path)
   --mode <mode>        Diff mode: unstaged, staged, branch (default: unstaged)
+  --theme <theme>      Force the theme for this session: light, dark
+                       (default: the saved preference, else the system theme)
   --dev                Development mode (proxy to Vite dev server)
   -h, --help           Show this help message
   -v, --version        Show version number
@@ -39,6 +41,7 @@ Examples:
   local-review                       # Review unstaged changes
   local-review --mode staged         # Review staged changes
   local-review --mode branch         # Review all branch changes vs base
+  local-review --theme light         # Force the light theme for this session
   local-review -- --stat             # Pass extra args to git diff
 `.trim(),
   );
@@ -54,6 +57,7 @@ function parseArgs(argv: string[]): {
   outputFile: string;
   loadExisting: boolean;
   mode: DiffMode;
+  theme: "light" | "dark" | undefined;
   devMode: boolean;
   extraArgs: string[];
   shouldExit: boolean;
@@ -64,6 +68,7 @@ function parseArgs(argv: string[]): {
     outputFile: "./review.xml",
     loadExisting: false,
     mode: "unstaged" as DiffMode,
+    theme: undefined as "light" | "dark" | undefined,
     devMode: false,
     extraArgs: [] as string[],
     shouldExit: false,
@@ -118,6 +123,16 @@ function parseArgs(argv: string[]): {
         }
         break;
 
+      case "--theme": {
+        const theme = argv[++i];
+        if (theme !== "light" && theme !== "dark") {
+          console.error("Error: --theme must be one of: light, dark");
+          process.exit(1);
+        }
+        result.theme = theme;
+        break;
+      }
+
       case "--dev":
         result.devMode = true;
         if (result.port === 0) result.port = 3000;
@@ -163,6 +178,7 @@ async function main(): Promise<void> {
     initialMode: args.mode,
     extraArgs: args.extraArgs,
     devMode: args.devMode,
+    themeOverride: args.theme,
   });
 
   if (!args.noOpen) {

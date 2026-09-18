@@ -1,6 +1,12 @@
 // Fetch wrapper for the API
 
-import type { DiffMode, DiffResponse, ReviewState } from "@shared/types.js";
+import type {
+  DiffMode,
+  DiffResponse,
+  DisplaySettings,
+  ReviewState,
+  SettingsResponse,
+} from "@shared/types.js";
 
 const BASE = "";
 
@@ -35,4 +41,29 @@ export function submitReview(state: ReviewState): Promise<{ path: string }> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(state),
   });
+}
+
+export function fetchSettings(): Promise<SettingsResponse> {
+  return api("/api/settings");
+}
+
+/** Per-key rather than a whole-object write, so simultaneous instances editing
+ *  different settings don't clobber each other. */
+export function patchSettings(patch: Partial<DisplaySettings>): Promise<DisplaySettings> {
+  return api("/api/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+}
+
+/** Same write, allowed to outlive the page. `sendBeacon` only issues POSTs,
+ *  hence `keepalive`; fire-and-forget, there is no one left to answer. */
+export function patchSettingsOnUnload(patch: Partial<DisplaySettings>): void {
+  void fetch(`${BASE}/api/settings`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+    keepalive: true,
+  }).catch(() => {});
 }

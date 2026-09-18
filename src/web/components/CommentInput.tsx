@@ -1,5 +1,6 @@
 import type { ReviewComment } from "@shared/types.js";
 import { useCallback, useState } from "react";
+import { Button } from "./Button";
 
 interface CommentInputProps {
   filePath: string;
@@ -46,37 +47,26 @@ export default function CommentInput({
   );
 
   return (
-    <div className="p-2 bg-neutral-900/95 border border-neutral-800/60 rounded-b-md">
+    <div className="p-2 bg-panel border border-hair rounded-b-md">
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Write a comment..."
         rows={3}
-        className="w-full px-2.5 py-2 text-[13px] font-mono bg-neutral-800/50 border border-neutral-800/60 rounded-md resize-none focus:outline-none focus:border-neutral-600 text-neutral-200 placeholder-neutral-600 transition-colors leading-relaxed"
+        className="w-full px-2.5 py-2 text-[13px] bg-bg border border-hair rounded-md resize-none focus:outline-none focus:border-accent text-text placeholder-faint transition-colors leading-relaxed"
       />
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[11px] text-neutral-600 font-mono">
-          <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Ctrl</kbd>
+        <span className="text-[11px] text-faint">
+          <kbd className="px-1 py-px bg-track rounded text-[10px]">Ctrl</kbd>
           {" + "}
-          <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Enter</kbd>
+          <kbd className="px-1 py-px bg-track rounded text-[10px]">Enter</kbd>
         </span>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-2 py-0.5 text-[11px] font-mono text-neutral-400 hover:text-neutral-200 transition-colors rounded"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!body.trim()}
-            className="px-2 py-0.5 text-[11px] font-mono bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+        <div className="flex gap-1.5">
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button variant="primary" onClick={handleSubmit} disabled={!body.trim()}>
             Comment
-          </button>
+          </Button>
         </div>
       </div>
     </div>

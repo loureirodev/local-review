@@ -2,7 +2,15 @@
 
 import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
-import type { DiffMode, DiffResponse, ReviewState } from "../shared/types";
+import type {
+  DiffMode,
+  DiffResponse,
+  DisplaySettings,
+  ReviewState,
+  SettingsResponse,
+} from "../shared/types";
+import { DISPLAY_SETTINGS_VALIDATORS, isDisplaySettingsKey } from "../shared/types";
+import { patchSettings, readSettings } from "./config";
 import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
 import { deserializeReview } from "./xml-deserializer";
 import { serializeReview } from "./xml-serializer";
@@ -15,6 +23,7 @@ interface ServerOptions {
   initialMode: DiffMode;
   extraArgs: string[];
   devMode: boolean;
+  themeOverride?: "light" | "dark";
 }
 
 let currentMode: DiffMode = "unstaged";
@@ -110,6 +119,42 @@ async function handleApiRequest(
         500,
       );
     }
+  }
+
+  // GET /api/settings: stored display settings merged over the defaults.
+  // `--theme` rides alongside them so the stored preference survives underneath.
+  if (pathname === "/api/settings" && req.method === "GET") {
+    const body: SettingsResponse = { settings: await readSettings() };
+    if (opts.themeOverride) body.sessionTheme = opts.themeOverride;
+    return jsonResponse(body);
+  }
+
+  // PATCH /api/settings: per-key rather than a whole-object PUT, so two
+  // instances editing different settings don't clobber each other.
+  if (pathname === "/api/settings" && req.method === "PATCH") {
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ error: "Invalid request body" }, 400);
+    }
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      return jsonResponse({ error: "Invalid request body" }, 400);
+    }
+
+    // Validate the whole payload first, so one bad key is never half-applied.
+    const patch: Partial<DisplaySettings> = {};
+    for (const [key, value] of Object.entries(body)) {
+      if (!isDisplaySettingsKey(key)) {
+        return jsonResponse({ error: `Unknown setting: ${key}` }, 400);
+      }
+      if (!DISPLAY_SETTINGS_VALIDATORS[key](value as never)) {
+        return jsonResponse({ error: `Invalid value for ${key}` }, 400);
+      }
+      (patch as Record<string, unknown>)[key] = value;
+    }
+
+    return jsonResponse(await patchSettings(patch));
   }
 
   return jsonResponse({ error: "Not found" }, 404);

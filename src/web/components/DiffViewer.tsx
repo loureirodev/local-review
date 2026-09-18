@@ -11,6 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCollapse } from "../context/CollapseContext";
 import { useReview } from "../context/ReviewContext";
 import { useSettings } from "../hooks/useSettings";
+import { useTheme } from "../hooks/useTheme";
+import { IconButton } from "./Button";
 import CommentDisplay from "./CommentDisplay";
 import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay";
 import { HIGHLIGHTER_OPTIONS, THEME, WORKER_POOL_OPTIONS } from "./diff/constants";
@@ -20,6 +22,7 @@ import { FileCommentBadge, HeaderChevron, ViewedToggle } from "./diff/HeaderCont
 import { type DiffCodeViewItem, useCodeViewItems } from "./diff/useCodeViewItems";
 import { useDiffData } from "./diff/useDiffData";
 import FileCommentsDrawer from "./FileCommentsDrawer";
+import { ICON_SIZE_INLINE, PlusIcon } from "./icons";
 
 interface DiffViewerProps {
   patch: string;
@@ -40,6 +43,10 @@ const EMPTY_FILE_DIFFS: FileDiffMetadata[] = [];
 
 /** Stable across renders on purpose — see `codeViewOptions`. */
 const CODE_VIEW_LAYOUT = { paddingTop: 0, paddingBottom: 0, gap: 0 } as const;
+
+/** Chrome keeps a fixed size while the font-size control moves the code. */
+const HEADER_FONT_SIZE = 12;
+const HEADER_LINE_HEIGHT = 20;
 
 /** How long the flash tint takes to fade, once the target section is on screen. */
 const NAVIGATION_FLASH_MS = 1400;
@@ -70,6 +77,9 @@ function DiffViewerInner({
     toggleViewed,
   } = useReview();
   const { getIsCollapsed, toggleFile } = useCollapse();
+  // `CodeView` takes its theme as a JavaScript value, not a selector, so unlike
+  // the file tree it cannot follow `data-theme` on its own.
+  const { theme } = useTheme();
 
   const { allFileDiffs, lineAnnotationsByFile, fileLevelCommentsByFile } = useDiffData(
     patch,
@@ -238,7 +248,7 @@ function DiffViewerInner({
       // unmounted, and on a long scroll would expire before the reviewer arrived.
       styleRef.current.textContent = `
         @keyframes local-review-navigation-flash {
-          from { background-color: rgba(59, 130, 246, 0.16); }
+          from { background-color: color-mix(in oklab, var(--color-accent) 16%, transparent); }
           to { background-color: transparent; }
         }
         diffs-container[data-file-id="${escaped}"] {
@@ -278,7 +288,7 @@ function DiffViewerInner({
     ) => {
       if (!annotation.metadata) return null;
       return (
-        <div className="border-t border-neutral-800/40">
+        <div className="border-t border-hair">
           {annotation.metadata.comments.map((comment) => (
             <CommentDisplay
               key={comment.id}
@@ -325,22 +335,28 @@ function DiffViewerInner({
 
   const renderGutterUtility = useCallback(
     (getHoveredLine: GutterHoverGetter, item: DiffCodeViewItem) => (
-      <button
-        type="button"
-        onClick={() => {
-          const hovered = getHoveredLine();
-          if (!hovered) return;
-          requestLineComment(
-            item.id,
-            hovered.lineNumber,
-            hovered.side === "deletions" ? "deletion" : "addition",
-          );
-        }}
-        className="absolute -left-2 top-1/2 -translate-y-1/2 size-6 bg-neutral-700/90 hover:bg-neutral-600 text-neutral-300 hover:text-neutral-100 rounded-full flex items-center justify-center text-lg shadow-lg shadow-black/30 z-10 transition-colors border border-neutral-600/50"
-        title="Add comment"
-      >
-        +
-      </button>
+      // Slotted into CodeView's gutter, so document styles reach it. The
+      // wrapper positions it over the line and carries the shadow (a documented
+      // exception in DESIGN.md), leaving the button itself unstyled.
+      <div className="absolute -left-2 top-1/2 -translate-y-1/2 z-10 rounded-md shadow-float">
+        <IconButton
+          compact
+          filled
+          onClick={() => {
+            const hovered = getHoveredLine();
+            if (!hovered) return;
+            requestLineComment(
+              item.id,
+              hovered.lineNumber,
+              hovered.side === "deletions" ? "deletion" : "addition",
+            );
+          }}
+          title="Add comment"
+          aria-label="Add comment"
+        >
+          <PlusIcon size={ICON_SIZE_INLINE} />
+        </IconButton>
+      </div>
     ),
     [requestLineComment],
   );
@@ -354,7 +370,7 @@ function DiffViewerInner({
   const codeViewOptions = useMemo(
     () => ({
       theme: THEME,
-      themeType: "dark" as const,
+      themeType: theme,
       diffStyle,
       lineDiffType: "word" as const,
       overflow: wrapLines ? ("wrap" as const) : ("scroll" as const),
@@ -373,8 +389,24 @@ function DiffViewerInner({
           --diffs-font-size: ${fontSize}px;
           --diffs-line-height: ${lineHeight}px;
           --diffs-font-family: var(--font-mono);
-          --diffs-header-font-family: var(--font-mono);
+          /* The file header is chrome, not content: UI face, fixed size. */
+          --diffs-header-font-family: var(--font-body);
+          /* Tints come from the tokens, which the library mixes with the diff
+             ground itself. Kept as var() references because a change to this
+             string resets every item's layout. */
+          --diffs-addition-color-override: var(--color-success);
+          --diffs-deletion-color-override: var(--color-danger);
         }
+
+        /* --diffs-font-size is inherited from :host, so the header and hunk
+           separators would grow with the code. Pinned here rather than scoped,
+           because the row layout maths reads the variable from :host. */
+        [data-diffs-header],
+        [data-separator] {
+          font-size: ${HEADER_FONT_SIZE}px;
+          line-height: ${HEADER_LINE_HEIGHT}px;
+        }
+
         /* Default is "overflow: scroll clip", which always shows the
            horizontal scrollbar even when content fits or wrap is enabled.
            Override: hidden when wrapping (no scroll possible), auto when
@@ -384,12 +416,12 @@ function DiffViewerInner({
         }
       `,
     }),
-    [diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight, handlePostRender],
+    [theme, diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight, handlePostRender],
   );
 
   if (!patch || !allFileDiffs || allFileDiffs.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-neutral-500">
+      <div className="flex items-center justify-center h-full text-muted">
         <div className="text-center">
           <p className="text-lg">No changes found</p>
           <p className="text-sm mt-1">Try a different diff mode</p>
