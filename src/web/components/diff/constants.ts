@@ -1,4 +1,4 @@
-export const THEME = { dark: "github-dark", light: "github-light" } as const;
+export const THEME = { dark: "kanagawa-dragon", light: "solarized-light" } as const;
 
 function workerFactory(): Worker {
   return new Worker(new URL("@pierre/diffs/worker/worker.js", import.meta.url), {

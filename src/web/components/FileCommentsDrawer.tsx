@@ -1,9 +1,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { DiffSource, ReviewComment } from "@shared/types.js";
 import { useCallback, useRef, useState } from "react";
+import { Button, IconButton } from "./Button";
 import CommentDisplay from "./CommentDisplay";
 import CommentInput from "./CommentInput";
-import { CloseIcon } from "./icons";
+import { CloseIcon, ICON_SIZE_INLINE, PlusIcon } from "./icons";
 
 interface FileCommentsDrawerProps {
   filePath: string | null;
@@ -52,33 +53,29 @@ export default function FileCommentsDrawer({
           {filePath && (
             <>
               {/* Header */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-800/60 bg-neutral-950/80 sticky top-0 z-10">
-                <Dialog.Title className="text-[13px] font-mono text-neutral-300 truncate flex-1">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-hair bg-bg sticky top-0 z-10">
+                <Dialog.Title className="text-[13px] text-text truncate flex-1">
                   {filePath.split("/").pop()}
-                  <span className="text-neutral-600 ml-2">
+                  <span className="text-faint ml-2">
                     {comments.length} comment{comments.length !== 1 ? "s" : ""}
                   </span>
                 </Dialog.Title>
                 <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="p-1 text-neutral-500 hover:text-neutral-300 transition-colors rounded"
-                    title="Close"
-                  >
-                    <CloseIcon className="size-4" />
-                  </button>
+                  <IconButton compact title="Close" aria-label="Close">
+                    <CloseIcon size={ICON_SIZE_INLINE} />
+                  </IconButton>
                 </Dialog.Close>
               </div>
 
               {/* Full path */}
-              <div className="px-4 py-1.5 border-b border-neutral-800/30">
-                <span className="text-[11px] font-mono text-neutral-600 break-all">{filePath}</span>
+              <div className="px-4 py-1.5 border-b border-hair">
+                <span className="text-[11px] text-faint break-all">{filePath}</span>
               </div>
 
               {/* Comments list */}
               <div className="flex-1 overflow-y-auto p-2">
                 {comments.length === 0 && !inputVisible ? (
-                  <div className="text-center py-8 text-neutral-600 text-[13px] font-mono">
+                  <div className="text-center py-8 text-faint text-[13px]">
                     No file-level comments yet
                   </div>
                 ) : (
@@ -98,7 +95,7 @@ export default function FileCommentsDrawer({
               </div>
 
               {/* Add comment area */}
-              <div className="border-t border-neutral-800/60 bg-neutral-950/60">
+              <div className="border-t border-hair bg-bg">
                 {inputVisible ? (
                   <CommentInput
                     filePath={filePath}
@@ -108,13 +105,12 @@ export default function FileCommentsDrawer({
                     onCancel={() => setInputVisible(false)}
                   />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setInputVisible(true)}
-                    className="w-full px-4 py-2.5 text-[12px] font-mono text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/30 transition-colors text-left"
-                  >
-                    + Add file comment
-                  </button>
+                  <div className="p-2">
+                    <Button onClick={() => setInputVisible(true)}>
+                      <PlusIcon size={ICON_SIZE_INLINE} />
+                      Add file comment
+                    </Button>
+                  </div>
                 )}
               </div>
             </>

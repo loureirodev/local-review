@@ -33,5 +33,6 @@ Conventional Commits enforced via `commitlint` + `husky`. Lowercase type, impera
 - CLI `--dev` proxies non-API → Vite (`:5173`)
 
 ## Key Conventions
+- **Visual conventions live in `DESIGN.md`** — colour roles, themes, typography, icon rules, shadows. Consult it before any visual change and update it when a visual decision is made. Never introduce a literal colour class (`text-neutral-300`, `bg-blue-500`); use the role utilities (`text-muted`, `bg-accent`).
 - Code style enforced by Biome — see `biome.json`
 - See `CONTRIBUTING.md` for setup, project structure, and workflow

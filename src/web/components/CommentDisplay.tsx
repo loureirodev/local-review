@@ -1,6 +1,15 @@
 import type { DiffSource, ReviewComment } from "@shared/types.js";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { AgentIcon, CloseIcon, GitHubIcon, GitLabIcon, PencilIcon, UserIcon } from "./icons";
+import { Button, IconButton } from "./Button";
+import {
+  AgentIcon,
+  CloseIcon,
+  GitHubIcon,
+  GitLabIcon,
+  ICON_SIZE_INLINE,
+  PencilIcon,
+  UserIcon,
+} from "./icons";
 
 function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }) {
   if (!source) return null;
@@ -10,19 +19,19 @@ function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }
 
   switch (source.type) {
     case "github-pr":
-      icon = <GitHubIcon />;
+      icon = <GitHubIcon size={ICON_SIZE_INLINE} />;
       tooltip = url ? "Open original comment on GitHub" : "GitHub comment";
       break;
     case "gitlab-mr":
-      icon = <GitLabIcon />;
+      icon = <GitLabIcon size={ICON_SIZE_INLINE} />;
       tooltip = url ? "Open original comment on GitLab" : "GitLab comment";
       break;
     case "agent":
-      icon = <AgentIcon />;
+      icon = <AgentIcon size={ICON_SIZE_INLINE} />;
       tooltip = "AI agent review";
       break;
     case "local":
-      icon = <UserIcon />;
+      icon = <UserIcon size={ICON_SIZE_INLINE} />;
       tooltip = "Local comment";
       break;
     default:
@@ -36,7 +45,7 @@ function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }
         target="_blank"
         rel="noopener noreferrer"
         title={tooltip}
-        className="text-neutral-500 hover:text-neutral-300 transition-colors"
+        className="text-muted hover:text-text transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {icon}
@@ -107,101 +116,88 @@ const CommentDisplay = memo(function CommentDisplay({
   );
 
   return (
-    <div className="mx-1 my-1 bg-neutral-900/80 border border-neutral-800/60 rounded-md overflow-hidden">
+    <div className="mx-1 my-1 bg-panel border border-hair rounded-md overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center gap-2 px-2.5 py-1 border-b border-neutral-800/40 bg-neutral-900/50">
-        <span className="text-neutral-500 flex-shrink-0">
+      <div className="flex items-center gap-2 px-2.5 py-1 border-b border-hair">
+        <span className="text-muted flex-shrink-0">
           <OriginIcon source={source} url={comment.url} />
         </span>
-        <span className="text-[11px] font-mono text-neutral-500">
+        <span className="text-[11px] text-muted">
           {comment.line !== null ? (
             <>
               L{comment.line}
-              {comment.side ? <span className="text-neutral-600"> {comment.side}</span> : null}
+              {comment.side ? <span className="text-faint"> {comment.side}</span> : null}
               {orphanedLine ? (
-                <span className="text-neutral-600 italic"> — not in current diff</span>
+                <span className="text-faint italic"> (not in current diff)</span>
               ) : null}
             </>
           ) : (
             "file"
           )}
         </span>
-        <span className="text-neutral-700">&middot;</span>
-        <span className="text-[11px] font-mono text-neutral-600">
+        <span className="text-faint">&middot;</span>
+        <span className="text-[11px] text-faint">
           {new Date(comment.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}
         </span>
-        {comment.edited ? (
-          <span className="text-[10px] font-mono text-amber-500/70 italic">(edited)</span>
-        ) : null}
+        {comment.edited ? <span className="text-[10px] text-warning italic">(edited)</span> : null}
 
         <div className="ml-auto flex items-center gap-0.5">
           {!editing ? (
-            <button
-              type="button"
+            <IconButton
+              compact
               onClick={() => {
                 setEditBody(comment.body);
                 setEditing(true);
               }}
-              className="flex-shrink-0 p-0.5 text-neutral-600 hover:text-neutral-300 transition-colors rounded"
               title="Edit comment"
+              aria-label="Edit comment"
             >
-              <PencilIcon />
-            </button>
+              <PencilIcon size={ICON_SIZE_INLINE} />
+            </IconButton>
           ) : null}
-          <button
-            type="button"
+          <IconButton
+            compact
+            tone="danger"
             onClick={() => onDelete(comment.id)}
-            className="flex-shrink-0 p-0.5 text-neutral-600 hover:text-red-400/80 transition-colors rounded"
             title="Delete comment"
+            aria-label="Delete comment"
           >
-            <CloseIcon className="w-3 h-3" />
-          </button>
+            <CloseIcon size={ICON_SIZE_INLINE} />
+          </IconButton>
         </div>
       </div>
 
       {/* Body */}
       <div className="px-2.5 py-1.5">
         {editing ? (
-          <div className="flex flex-col gap-1.5">
+          <div>
             <textarea
               ref={textareaRef}
               value={editBody}
               onChange={(e) => setEditBody(e.target.value)}
               onKeyDown={handleKeyDown}
               rows={3}
-              className="w-full bg-neutral-800/80 text-[13px] text-neutral-200 font-mono rounded border border-neutral-700/50 px-2 py-1.5 resize-y focus:outline-none focus:border-neutral-600 placeholder-neutral-600"
+              className="w-full px-2.5 py-2 text-[13px] bg-bg border border-hair rounded-md resize-none focus:outline-none focus:border-accent text-text placeholder-faint transition-colors leading-relaxed"
             />
-            <div className="flex items-center justify-end gap-2">
-              <span className="text-[11px] text-neutral-600 font-mono mr-auto">
-                <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Ctrl</kbd>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[11px] text-faint">
+                <kbd className="px-1 py-px bg-track rounded text-[10px]">Ctrl</kbd>
                 {" + "}
-                <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Enter</kbd>
-                {" to save · "}
-                <kbd className="px-1 py-px bg-neutral-800/60 rounded text-[10px]">Esc</kbd>
-                {" to cancel"}
+                <kbd className="px-1 py-px bg-track rounded text-[10px]">Enter</kbd>
               </span>
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="px-2 py-0.5 text-[11px] text-neutral-400 hover:text-neutral-200 transition-colors rounded"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!canSave}
-                className="px-2 py-0.5 text-[11px] bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Save
-              </button>
+              <div className="flex gap-1.5">
+                <Button onClick={handleCancel}>Cancel</Button>
+                <Button variant="primary" onClick={handleSave} disabled={!canSave}>
+                  Save
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
-          <p className="text-[13px] text-neutral-300 whitespace-pre-wrap break-words leading-relaxed">
+          <p className="text-[13px] text-text whitespace-pre-wrap break-words leading-relaxed">
             {comment.body}
           </p>
         )}

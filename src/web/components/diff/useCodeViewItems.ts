@@ -17,7 +17,7 @@ interface UseCodeViewItemsParams {
 export interface CodeViewItemsResult {
   /** Changes when the file set changes (membership or order), signalling that
    *  a targeted `updateItem` pass is no longer enough and the viewer needs a
-   *  full `setItems` reconcile. See D8 in design.md. */
+   *  full `setItems` reconcile. */
   filesKey: string;
   /** Items to seed the viewer once via `initialItems`. */
   initialItems: DiffCodeViewItem[];

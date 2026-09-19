@@ -5,10 +5,14 @@ import {
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
 } from "../hooks/useSettings";
+import { IconButton, SegmentedControl, ToggleRow } from "./Button";
 import {
   FontSizeIcon,
+  ICON_SIZE_INLINE,
   LineNumbersIcon,
   LineSpacingIcon,
+  MinusIcon,
+  PlusIcon,
   SettingsIcon,
   SplitIcon,
   UnifiedIcon,
@@ -26,34 +30,6 @@ interface SettingsPopoverProps {
   onShowLineNumbersChange: (show: boolean) => void;
   onFontSizeChange: (size: number) => void;
   onLineHeightChange: (height: number) => void;
-}
-
-/* ── Toggle Row ── */
-
-function ToggleRow({
-  icon,
-  label,
-  checked,
-  onChange,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs rounded hover:bg-neutral-800/70 transition-colors group"
-    >
-      <span className="text-neutral-400 group-hover:text-neutral-300 transition-colors">
-        {icon}
-      </span>
-      <span className="text-neutral-300 flex-1 text-left">{label}</span>
-      <span className="toggle-switch" data-checked={String(checked)} aria-hidden="true" />
-    </button>
-  );
 }
 
 /* ── Stepper Row ── */
@@ -79,29 +55,29 @@ function StepperRow({
 }) {
   return (
     <div className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs group">
-      <span className="text-neutral-400">{icon}</span>
-      <span className="text-neutral-300 flex-1">{label}</span>
+      <span className="text-muted">{icon}</span>
+      <span className="text-text flex-1 whitespace-nowrap">{label}</span>
       <div className="flex items-center gap-1">
-        <button
-          type="button"
+        <IconButton
+          compact
           onClick={() => onChange(Math.max(min, value - step))}
           disabled={value <= min}
-          className="size-5 flex items-center justify-center rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-neutral-300 transition-colors"
+          aria-label={`Decrease ${label.toLowerCase()}`}
         >
-          −
-        </button>
-        <span className="w-10 text-center text-neutral-300 font-mono tabular-nums text-[11px]">
+          <MinusIcon size={ICON_SIZE_INLINE} />
+        </IconButton>
+        <span className="w-10 text-center text-text tabular-nums text-[11px]">
           {value}
           {unit}
         </span>
-        <button
-          type="button"
+        <IconButton
+          compact
           onClick={() => onChange(Math.min(max, value + step))}
           disabled={value >= max}
-          className="size-5 flex items-center justify-center rounded bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 text-neutral-300 transition-colors"
+          aria-label={`Increase ${label.toLowerCase()}`}
         >
-          +
-        </button>
+          <PlusIcon size={ICON_SIZE_INLINE} />
+        </IconButton>
       </div>
     </div>
   );
@@ -151,85 +127,80 @@ export default function SettingsPopover({
   return (
     <div className="relative" ref={containerRef}>
       {/* Trigger */}
-      <button
-        type="button"
+      <IconButton
+        active={open}
         onClick={() => setOpen((v) => !v)}
-        className={`p-1.5 rounded transition-colors ${
-          open
-            ? "bg-neutral-700 text-neutral-200"
-            : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800"
-        }`}
         title="Display settings"
         aria-label="Display settings"
+        aria-expanded={open}
       >
         <SettingsIcon open={open} />
-      </button>
+      </IconButton>
       {/* Popover */}
       <div
-        className={`absolute top-full right-0 mt-1.5 w-56 bg-neutral-900 border border-neutral-800/80 rounded-lg shadow-2xl shadow-black/50 z-50 overflow-hidden transition-all duration-200 origin-top-right ${
+        className={`absolute top-full right-0 mt-1.5 w-56 bg-panel border border-hair rounded-lg shadow-float-lg z-50 overflow-hidden transition-all duration-200 origin-top-right ${
           open
             ? "opacity-100 scale-100 pointer-events-auto"
             : "opacity-0 scale-95 pointer-events-none"
         }`}
       >
         {/* Header */}
-        <div className="px-2.5 py-1.5 border-b border-neutral-800 text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+        <div className="px-2.5 py-1.5 border-b border-hair text-[11px] font-medium text-muted uppercase tracking-wider">
           Display
         </div>
 
         <div className="p-1.5 space-y-0.5">
           {/* Diff style — segmented control */}
           <div className="px-2.5 py-1.5">
-            <div className="text-[11px] text-neutral-500 mb-1.5">Diff layout</div>
-            <div className="flex gap-1 p-0.5 bg-neutral-800 rounded">
-              <button
-                type="button"
-                onClick={() => onDiffStyleChange("split")}
-                className={`flex items-center justify-center gap-1.5 flex-1 px-2 py-1 text-xs rounded transition-all duration-150 ${
-                  diffStyle === "split"
-                    ? "bg-neutral-700 text-neutral-100 shadow-sm"
-                    : "text-neutral-400 hover:text-neutral-300"
-                }`}
-              >
-                <SplitIcon />
-                Split
-              </button>
-              <button
-                type="button"
-                onClick={() => onDiffStyleChange("unified")}
-                className={`flex items-center justify-center gap-1.5 flex-1 px-2 py-1 text-xs rounded transition-all duration-150 ${
-                  diffStyle === "unified"
-                    ? "bg-neutral-700 text-neutral-100 shadow-sm"
-                    : "text-neutral-400 hover:text-neutral-300"
-                }`}
-              >
-                <UnifiedIcon />
-                Unified
-              </button>
-            </div>
+            <div className="text-[11px] text-muted mb-1.5">Diff layout</div>
+            <SegmentedControl
+              aria-label="Diff layout"
+              value={diffStyle}
+              options={[
+                {
+                  value: "split",
+                  label: (
+                    <>
+                      <SplitIcon size={ICON_SIZE_INLINE} />
+                      Split
+                    </>
+                  ),
+                },
+                {
+                  value: "unified",
+                  label: (
+                    <>
+                      <UnifiedIcon size={ICON_SIZE_INLINE} />
+                      Unified
+                    </>
+                  ),
+                },
+              ]}
+              onChange={onDiffStyleChange}
+            />
           </div>
 
-          <div className="mx-2 border-t border-neutral-800" />
+          <div className="mx-2 border-t border-hair" />
 
           {/* Toggle options */}
           <ToggleRow
-            icon={<WrapIcon />}
+            icon={<WrapIcon size={ICON_SIZE_INLINE} />}
             label="Wrap lines"
             checked={wrapLines}
             onChange={onWrapLinesChange}
           />
           <ToggleRow
-            icon={<LineNumbersIcon />}
+            icon={<LineNumbersIcon size={ICON_SIZE_INLINE} />}
             label="Line numbers"
             checked={showLineNumbers}
             onChange={onShowLineNumbersChange}
           />
 
-          <div className="mx-2 border-t border-neutral-800" />
+          <div className="mx-2 border-t border-hair" />
 
           {/* Font size & line height */}
           <StepperRow
-            icon={<FontSizeIcon />}
+            icon={<FontSizeIcon size={ICON_SIZE_INLINE} />}
             label="Font size"
             value={fontSize}
             min={FONT_SIZE_MIN}
@@ -239,7 +210,7 @@ export default function SettingsPopover({
             onChange={onFontSizeChange}
           />
           <StepperRow
-            icon={<LineSpacingIcon />}
+            icon={<LineSpacingIcon size={ICON_SIZE_INLINE} />}
             label="Line height"
             value={lineHeight}
             min={LINE_HEIGHT_MIN}

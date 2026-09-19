@@ -3,7 +3,7 @@ import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from "@
 import type { FileReviewState } from "@shared/types.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useCollapse } from "../context/CollapseContext";
-import { useSettings } from "../hooks/useSettings";
+import { LinkButton } from "./Button";
 
 interface FileTreeProps {
   files: FileInfo[];
@@ -25,36 +25,41 @@ const FILE_TYPE_TO_GIT_STATUS: Record<FileInfo["type"], GitStatusEntry["status"]
   change: "modified",
 };
 
-const FONT_FAMILY =
-  "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-
+/* Custom properties are inherited, so these cross the shadow boundary: pointing
+   each hook at a role token lets the tree follow the theme with no React
+   round-trip. Mapping table in DESIGN.md. */
 const TREE_STYLE_BASE = {
   flex: 1,
   minHeight: 0,
   "--trees-bg-override": "transparent",
-  "--trees-fg-override": "#d4d4d4",
-  "--trees-theme-list-hover-bg": "rgba(38,38,38,0.5)",
-  "--trees-selected-bg-override": "rgba(38,38,38,0.7)",
-  "--trees-selected-fg-override": "#f5f5f5",
-  "--trees-status-untracked-override": "rgba(74,222,128,0.8)",
-  "--trees-status-added-override": "rgba(74,222,128,0.8)",
-  "--trees-status-deleted-override": "rgba(248,113,113,0.8)",
-  "--trees-status-modified-override": "rgba(250,204,21,0.8)",
-  "--trees-status-renamed-override": "rgba(96,165,250,0.8)",
+  "--trees-fg-override": "var(--color-text)",
+  "--trees-theme-list-hover-bg": "var(--color-track)",
+  "--trees-selected-bg-override": "var(--color-accent-tint)",
+  "--trees-selected-fg-override": "var(--color-text)",
+  "--trees-status-untracked-override": "var(--color-success)",
+  "--trees-status-added-override": "var(--color-success)",
+  "--trees-status-deleted-override": "var(--color-danger)",
+  "--trees-status-modified-override": "var(--color-warning)",
+  "--trees-status-renamed-override": "var(--color-renamed)",
   "--trees-padding-inline-override": "8px",
-  "--trees-font-family-override": FONT_FAMILY,
+  "--trees-font-family-override": "var(--font-body)",
+  // Fixed: the font-size control moves the code, not the chrome. See DESIGN.md.
+  "--trees-font-size-override": "12px",
 } as React.CSSProperties;
 
 // Injected once into the shadow root via unsafeCSS (higher specificity than base layer).
 const UNSAFE_CSS = `
   :host {
-    color-scheme: dark;
+    /* The library ships "color-scheme: light dark", so its light-dark() calls
+       follow the OS and ignore data-theme. Inheriting picks up :root's resolved
+       scheme instead. */
+    color-scheme: inherit;
   }
 
-  /* Fix truncation ellipsis: without color-scheme the light-dark() fallback is
-     transparent, so the … marker overlaps the clipped text instead of covering it. */
+  /* --trees-bg is transparent here (see TREE_STYLE_BASE), so the truncation
+     marker needs the page ground or it overlaps the clipped text. */
   [data-truncate-container] {
-    --truncate-marker-background-color: rgb(10, 10, 10);
+    --truncate-marker-background-color: var(--color-bg);
   }
 
   /* Hide the M/U/D/R git letter — the filename color already conveys the status. */
@@ -70,8 +75,8 @@ const UNSAFE_CSS = `
   }
 
   [data-item-section='decoration'] > span {
-    background-color: rgba(79, 70, 229, 0.2);
-    color: rgba(165, 180, 252, 0.85);
+    background-color: var(--color-accent);
+    color: var(--color-accent-fg);
     border-radius: 999px;
     padding: 0 5px;
     font-size: 10px;
@@ -86,39 +91,25 @@ const UNSAFE_CSS = `
   }
 `;
 
-/* ── Footer ── */
-
 function CollapseFooter() {
   const { totalFiles, collapsedCount, setAllCollapsed } = useCollapse();
   if (totalFiles === 0) return null;
   return (
-    <div className="flex items-center gap-2 px-2 py-1.5 border-t border-neutral-800/50 bg-neutral-950/40 text-[11px] text-neutral-500">
+    <div className="flex items-center gap-2 px-2 py-1.5 border-t border-hair bg-panel text-[11px] text-muted">
       <span className="flex-1 truncate">
         {totalFiles} file{totalFiles !== 1 ? "s" : ""}
         {collapsedCount > 0 && ` · ${collapsedCount} collapsed`}
       </span>
-      <button
-        type="button"
-        onClick={() => setAllCollapsed(true)}
-        className="hover:text-neutral-300 transition-colors"
-        title="Collapse all files"
-      >
+      <LinkButton onClick={() => setAllCollapsed(true)} title="Collapse all files">
         Collapse all
-      </button>
-      <span className="text-neutral-700">·</span>
-      <button
-        type="button"
-        onClick={() => setAllCollapsed(false)}
-        className="hover:text-neutral-300 transition-colors"
-        title="Expand all files"
-      >
+      </LinkButton>
+      <span className="text-faint">·</span>
+      <LinkButton onClick={() => setAllCollapsed(false)} title="Expand all files">
         Expand all
-      </button>
+      </LinkButton>
     </div>
   );
 }
-
-/* ── Main Component ── */
 
 export default function FileTree({
   files,
@@ -126,18 +117,8 @@ export default function FileTree({
   selectedFile,
   onSelectFile,
 }: FileTreeProps) {
-  const { state: settings } = useSettings();
   const reviewFilesRef = useRef(reviewFiles);
   reviewFilesRef.current = reviewFiles;
-
-  const treeStyle = useMemo(
-    () =>
-      ({
-        ...TREE_STYLE_BASE,
-        "--trees-font-size-override": `${settings.fontSize}px`,
-      }) as React.CSSProperties,
-    [settings.fontSize],
-  );
 
   const { model } = useFileTree({
     paths: files.map((f) => f.name),
@@ -166,16 +147,10 @@ export default function FileTree({
     model.setGitStatus(gitEntries);
   }, [gitEntries, model]);
 
-  // Refresh the comment-count decorations. `renderRowDecoration` reads live data
-  // from a ref, so the tree has to be told to re-render when the counts change.
-  // @pierre/trees exposes no "invalidate decorations" call, and `setComposition`
-  // is the only public method that re-renders unconditionally — so round-trip the
-  // current composition, which changes no state.
-  //
-  // This used to ride on `setGitStatus`, which re-rendered on every call. Since
-  // 1.0.0-beta.4 it early-returns when the resolved status is unchanged, which it
-  // always is here (it derives from `files`, not from comments), so the badges
-  // silently stopped updating.
+  // Refresh the comment-count decorations: `renderRowDecoration` reads from a
+  // ref, so the tree must be told to re-render. `setComposition` is the only
+  // public method that re-renders unconditionally, and round-tripping the
+  // current composition changes no state.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles is the change trigger; the decoration renderer reads it through a ref
   useEffect(() => {
     model.setComposition(model.getComposition());
@@ -262,17 +237,17 @@ export default function FileTree({
   return (
     <div className="flex flex-col h-full">
       {/* Search */}
-      <div className="p-2 border-b border-neutral-800/40">
+      <div className="p-2 border-b border-hair">
         <input
           type="text"
           placeholder="Filter files..."
           onChange={handleSearchChange}
-          className="w-full px-2 py-1 text-[13px] font-mono bg-neutral-900/60 border border-neutral-800/60 rounded-md focus:outline-none focus:border-neutral-600 text-neutral-200 placeholder-neutral-600 transition-colors"
+          className="w-full px-2 py-1 text-[13px] bg-panel border border-hair rounded-md focus:outline-none focus:border-accent text-text placeholder-faint transition-colors"
         />
       </div>
 
       {/* Tree */}
-      <PierreFileTree model={model} style={treeStyle} />
+      <PierreFileTree model={model} style={TREE_STYLE_BASE} />
 
       <CollapseFooter />
     </div>

@@ -1,6 +1,8 @@
 import type { DiffMode } from "@shared/types.js";
 import { useSettings } from "../hooks/useSettings";
-import { BranchIcon, ExportIcon, SidebarIcon } from "./icons";
+import { useTheme } from "../hooks/useTheme";
+import { Button, IconButton, SegmentedControl } from "./Button";
+import { BranchIcon, ExportIcon, ICON_SIZE_INLINE, SidebarIcon, ThemeIcon } from "./icons";
 import SettingsPopover from "./SettingsPopover";
 
 interface ToolbarProps {
@@ -23,7 +25,7 @@ const modeLabels: Record<DiffMode, string> = {
 };
 
 function Divider() {
-  return <div className="h-4 w-px bg-neutral-800/60 mx-1" />;
+  return <div className="h-4 w-px bg-hair mx-1" />;
 }
 
 export default function Toolbar({
@@ -39,33 +41,36 @@ export default function Toolbar({
   exporting,
 }: ToolbarProps) {
   const { state: settings, actions } = useSettings();
+  const { theme, setOverride } = useTheme();
+  // A straight flip of what is on screen: picking "system" back is a menu
+  // action, not something a one-glyph button can express.
+  const nextTheme = theme === "dark" ? "light" : "dark";
 
   const progressPercent = totalFiles > 0 ? Math.round((reviewedCount / totalFiles) * 100) : 0;
 
   return (
-    <header className="flex items-center h-10 px-1 bg-neutral-900/80 border-b border-neutral-800/40 flex-shrink-0 backdrop-blur-sm z-20">
+    <header className="flex items-center h-10 px-1 bg-panel border-b border-hair flex-shrink-0 z-20">
       {/* ── Left zone ── */}
       <div className="flex items-center gap-0.5">
         {/* Sidebar toggle */}
-        <button
-          type="button"
+        <IconButton
           onClick={onToggleSidebar}
-          className="flex items-center justify-center size-8 rounded-md transition-colors text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/60"
           title={`${sidebarCollapsed ? "Show" : "Hide"} file list (Ctrl+B)`}
+          aria-label={`${sidebarCollapsed ? "Show" : "Hide"} file list`}
         >
           <SidebarIcon collapsed={sidebarCollapsed} />
-        </button>
+        </IconButton>
 
         <Divider />
 
         {/* Branch info */}
-        <div className="flex items-center gap-1.5 px-1.5 text-xs text-neutral-500">
-          <BranchIcon />
-          <span className="font-mono font-medium text-neutral-300">{branch}</span>
+        <div className="flex items-center gap-1.5 px-1.5 text-xs text-muted">
+          <BranchIcon size={ICON_SIZE_INLINE} />
+          <span className="font-medium text-text">{branch}</span>
           {mode === "branch" ? (
-            <span className="text-neutral-600">
+            <span className="text-faint">
               {"→ "}
-              <span className="font-mono text-neutral-500">{baseBranch}</span>
+              <span className="text-muted">{baseBranch}</span>
             </span>
           ) : null}
         </div>
@@ -73,22 +78,15 @@ export default function Toolbar({
         <Divider />
 
         {/* Diff mode selector */}
-        <div className="flex items-center gap-px p-0.5 bg-neutral-800/40 rounded-md">
-          {(Object.keys(modeLabels) as DiffMode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => onModeChange(m)}
-              className={`px-2.5 py-1 text-xs rounded-[5px] transition-all duration-150 font-medium ${
-                mode === m
-                  ? "bg-neutral-700/80 text-neutral-100 shadow-sm shadow-black/20"
-                  : "text-neutral-500 hover:text-neutral-300"
-              }`}
-            >
-              {modeLabels[m]}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          aria-label="Diff mode"
+          value={mode}
+          options={(Object.keys(modeLabels) as DiffMode[]).map((m) => ({
+            value: m,
+            label: modeLabels[m],
+          }))}
+          onChange={onModeChange}
+        />
       </div>
 
       {/* ── Spacer ── */}
@@ -98,15 +96,15 @@ export default function Toolbar({
       <div className="flex items-center gap-0.5">
         {/* Review progress */}
         {totalFiles > 0 ? (
-          <div className="flex items-center gap-2 px-2 py-1 text-xs text-neutral-500">
+          <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted">
             <div className="flex items-center gap-1.5">
-              <div className="w-16 h-1 bg-neutral-800 rounded-full overflow-hidden">
+              <div className="w-16 h-1 bg-track rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-500/70 rounded-full transition-all duration-300"
+                  className="h-full bg-accent rounded-full transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
-              <span className="font-mono text-[11px] tabular-nums text-neutral-400">
+              <span className="text-[11px] tabular-nums text-muted">
                 {reviewedCount}/{totalFiles}
               </span>
             </div>
@@ -131,16 +129,23 @@ export default function Toolbar({
 
         <Divider />
 
-        {/* Export button */}
-        <button
-          type="button"
-          onClick={onExportReview}
-          disabled={exporting}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-neutral-800/60 hover:bg-neutral-700/70 disabled:opacity-40 text-neutral-300 hover:text-neutral-100 rounded-md transition-colors mr-1"
+        <IconButton
+          onClick={() => setOverride(nextTheme)}
+          title={`Switch to ${nextTheme} theme`}
+          aria-label={`Switch to ${nextTheme} theme`}
         >
-          <ExportIcon />
-          {exporting ? "Exporting..." : "Export"}
-        </button>
+          <ThemeIcon theme={nextTheme} />
+        </IconButton>
+
+        <Divider />
+
+        {/* Export button */}
+        <div className="mr-1">
+          <Button onClick={onExportReview} disabled={exporting}>
+            <ExportIcon size={ICON_SIZE_INLINE} />
+            {exporting ? "Exporting..." : "Export"}
+          </Button>
+        </div>
       </div>
     </header>
   );
