@@ -1,6 +1,6 @@
 // XML serializer: ReviewState → XML with custom schema
 
-import type { ReviewComment, ReviewState } from "../shared/types";
+import type { DiffSource, ReviewComment, ReviewState } from "../shared/types";
 
 function escapeXml(str: string): string {
   return str
@@ -21,9 +21,9 @@ function serializeComment(comment: ReviewComment, level: number): string {
   lines.push(`${indent(level)}<comment id="${escapeXml(comment.id)}"${editedAttr}>`);
   lines.push(`${indent(level + 1)}<file>${escapeXml(comment.filePath)}</file>`);
   if (comment.line !== null) {
-    lines.push(
-      `${indent(level + 1)}<line number="${comment.line}" side="${comment.side ?? "addition"}" />`,
-    );
+    // No side: a raw file line (folder mode).
+    const sideAttr = comment.side ? ` side="${comment.side}"` : "";
+    lines.push(`${indent(level + 1)}<line number="${comment.line}"${sideAttr} />`);
   }
   lines.push(`${indent(level + 1)}<body>${escapeXml(comment.body)}</body>`);
   lines.push(`${indent(level + 1)}<created-at>${escapeXml(comment.createdAt)}</created-at>`);
@@ -34,27 +34,51 @@ function serializeComment(comment: ReviewComment, level: number): string {
   return lines.join("\n");
 }
 
+function serializeSourceAttrs(source: DiffSource): string {
+  // Insertion order is attribute order; undefined values are dropped.
+  const attrs: Record<string, string | number | boolean | undefined> = { type: source.type };
+  switch (source.type) {
+    case "branch":
+      attrs.base = source.base;
+      break;
+    case "pending":
+      attrs.staged = source.staged;
+      break;
+    case "folder":
+      attrs.path = source.path;
+      break;
+    case "github-pr":
+      Object.assign(attrs, {
+        owner: source.owner,
+        repo: source.repo,
+        pr: source.pr,
+        base: source.base,
+      });
+      break;
+    case "gitlab-mr":
+      Object.assign(attrs, { project: source.project, mr: source.mr, base: source.base });
+      break;
+    case "agent":
+      attrs.agent = source.agent;
+      break;
+  }
+  if (source.type !== "folder") {
+    attrs.head = source.head;
+    attrs.commit = source.commit;
+  }
+  return Object.entries(attrs)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(([key, value]) => `${key}="${escapeXml(String(value))}"`)
+    .join(" ");
+}
+
 export function serializeReview(state: ReviewState): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
   lines.push("<review>");
   lines.push(`${indent(1)}<timestamp>${escapeXml(state.timestamp)}</timestamp>`);
 
-  // Source info
-  if (state.source.type === "local") {
-    lines.push(`${indent(1)}<source type="local" mode="${state.source.mode}" />`);
-  } else if (state.source.type === "github-pr") {
-    lines.push(
-      `${indent(1)}<source type="github-pr" owner="${escapeXml(state.source.owner)}" repo="${escapeXml(state.source.repo)}" pr="${state.source.pr}" />`,
-    );
-  } else if (state.source.type === "gitlab-mr") {
-    lines.push(
-      `${indent(1)}<source type="gitlab-mr" project="${escapeXml(state.source.project)}" mr="${state.source.mr}" />`,
-    );
-  } else if (state.source.type === "agent") {
-    const agentAttr = state.source.agent ? ` agent="${escapeXml(state.source.agent)}"` : "";
-    lines.push(`${indent(1)}<source type="agent"${agentAttr} />`);
-  }
+  lines.push(`${indent(1)}<source ${serializeSourceAttrs(state.source)} />`);
 
   // Files
   lines.push(`${indent(1)}<files>`);

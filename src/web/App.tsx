@@ -1,24 +1,52 @@
 import { parsePatchFiles } from "@pierre/diffs";
-import type { DiffMode, ReviewState } from "@shared/types.js";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import type { FolderTreeResponse, LaunchSource, ReviewState } from "@shared/types.js";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "./components/Button";
-import DiffViewer from "./components/DiffViewer";
+import DiffViewer, { type ViewerContent } from "./components/DiffViewer";
+import type { FolderFileState } from "./components/diff/diffParsing";
 import ErrorBoundary from "./components/ErrorBoundary";
 import FileTree, { type FileInfo } from "./components/FileTree";
 import Layout from "./components/Layout";
 import Toolbar from "./components/Toolbar";
 import { CollapseProvider } from "./context/CollapseContext";
 import { ReviewProvider, useReview } from "./context/ReviewContext";
-import { changeDiffMode, fetchDiff, fetchReview, submitReview } from "./hooks/api";
+import {
+  fetchDiff,
+  fetchFolderFile,
+  fetchFolderTree,
+  fetchReview,
+  fetchSession,
+  HttpError,
+  submitReview,
+} from "./hooks/api";
 import { SettingsProvider } from "./hooks/useSettings";
+import { createLoadQueue, type LoadOutcome } from "./utils/loadQueue";
 import { compareByTreeOrder } from "./utils/treeOrder";
 
-interface DiffState {
-  patch: string;
-  mode: DiffMode;
-  branch: string;
-  baseBranch: string;
+/** What was fetched for the launch mode: a patch, or a folder listing. */
+type ViewState =
+  | { kind: "diff"; patch: string; branch: string }
+  | ({ kind: "folder" } & FolderTreeResponse);
+
+const EMPTY_FILES: FileInfo[] = [];
+
+/** Fixed once the app has loaded. */
+interface Session {
+  launch: LaunchSource;
+  /** A saved review was loaded (`--existing`): its source is the one exported. */
+  reviewLoaded: boolean;
 }
+
+/** The launch source with the pending view currently shown. */
+function viewSource(launch: LaunchSource, staged: boolean): LaunchSource {
+  return launch.type === "pending" ? { ...launch, staged } : launch;
+}
+
+/** Folder files fetched at once; "expand all" on a big folder queues the rest. */
+const MAX_FILE_FETCHES = 4;
+
+/** Missing, oversized or binary: asking again gives the same answer. */
+const PERMANENT_FILE_ERRORS = new Set([404, 413, 415]);
 
 interface AsyncState {
   loading: boolean;
@@ -49,12 +77,28 @@ function asyncReducer(state: AsyncState, action: AsyncAction): AsyncState {
 }
 
 function AppContent() {
-  const [diffState, setDiffState] = useState<DiffState>({
-    patch: "",
-    mode: "unstaged",
-    branch: "",
-    baseBranch: "",
-  });
+  const [session, setSession] = useState<Session | null>(null);
+  const [view, setView] = useState<ViewState | null>(null);
+  const [staged, setStaged] = useState(false);
+  const [folderFiles, setFolderFiles] = useState<Record<string, FolderFileState>>({});
+  // Contents are cached for the session. A transient failure is shown but
+  // forgotten, so selecting the file again retries it.
+  const [fileQueue] = useState(() =>
+    createLoadQueue(MAX_FILE_FETCHES, async (path): Promise<LoadOutcome> => {
+      try {
+        const content = await fetchFolderFile(path);
+        setFolderFiles((prev) => ({ ...prev, [path]: { status: "loaded", content } }));
+        return "done";
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load file";
+        setFolderFiles((prev) => ({ ...prev, [path]: { status: "error", message } }));
+        return err instanceof HttpError && PERMANENT_FILE_ERRORS.has(err.status) ? "done" : "retry";
+      }
+    }),
+  );
+  // Only the latest load may apply its result: toggling the pending view
+  // quickly must not leave an older response on screen.
+  const loadIdRef = useRef(0);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [navigationTargetFile, setNavigationTargetFile] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -78,9 +122,14 @@ function AppContent() {
   }, []);
 
   const files: FileInfo[] = useMemo(() => {
-    if (!diffState.patch) return [];
+    if (view?.kind === "folder") {
+      return view.paths
+        .map((name) => ({ name }))
+        .sort((a, b) => compareByTreeOrder(a.name, b.name));
+    }
+    if (!view?.patch) return EMPTY_FILES;
     try {
-      const parsed = parsePatchFiles(diffState.patch);
+      const parsed = parsePatchFiles(view.patch);
       const allFiles = parsed.flatMap((p) => p.files);
       return allFiles
         .map((f) => ({
@@ -94,38 +143,64 @@ function AppContent() {
         }))
         .sort((a, b) => compareByTreeOrder(a.name, b.name));
     } catch {
-      return [];
+      return EMPTY_FILES;
     }
-  }, [diffState.patch]);
+  }, [view]);
 
   const reviewedCount = useMemo(
     () => Object.values(state.files).filter((f) => f.viewed).length,
     [state.files],
   );
 
-  const loadDiff = useCallback(async () => {
+  /** Fetches what the launch mode shows; the staged toggle and Retry rerun it. */
+  const loadView = useCallback(async (launch: LaunchSource, showStaged: boolean) => {
+    const loadId = ++loadIdRef.current;
+    const isStale = () => loadId !== loadIdRef.current;
     dispatchAsync({ type: "LOAD_START" });
     try {
-      const [data, savedReview] = await Promise.all([fetchDiff(), fetchReview()]);
-      if (savedReview) {
-        dispatch({ type: "LOAD_REVIEW", reviewState: savedReview });
+      if (launch.type === "folder") {
+        const tree = await fetchFolderTree();
+        if (isStale()) return;
+        setView({ kind: "folder", ...tree });
       } else {
-        dispatch({ type: "SET_SOURCE", source: data.source });
+        const data = await fetchDiff(showStaged);
+        if (isStale()) return;
+        setView({ kind: "diff", patch: data.patch, branch: data.info.branch });
       }
-      setDiffState({
-        patch: data.patch,
-        mode: data.source.type === "local" ? data.source.mode : "unstaged",
-        branch: data.info.branch,
-        baseBranch: data.info.baseBranch,
-      });
       dispatchAsync({ type: "LOAD_SUCCESS" });
+    } catch (err) {
+      if (isStale()) return;
+      dispatchAsync({
+        type: "LOAD_ERROR",
+        error: err instanceof Error ? err.message : "Failed to load diff",
+      });
+    }
+  }, []);
+
+  /** Runs once: the launch mode and the saved review. Re-reading the review
+   *  later would replace the comments made since with the file's contents. */
+  const init = useCallback(async () => {
+    dispatchAsync({ type: "LOAD_START" });
+    try {
+      const [{ source: launch }, savedReview] = await Promise.all([fetchSession(), fetchReview()]);
+      dispatch(
+        savedReview
+          ? { type: "LOAD_REVIEW", reviewState: savedReview }
+          : { type: "SET_SOURCE", source: launch },
+      );
+      // Opens on the pending view the CLI launched with (the saved review's,
+      // with --existing).
+      const initialStaged = launch.type === "pending" && launch.staged;
+      setStaged(initialStaged);
+      setSession({ launch, reviewLoaded: savedReview !== null });
+      await loadView(launch, initialStaged);
     } catch (err) {
       dispatchAsync({
         type: "LOAD_ERROR",
         error: err instanceof Error ? err.message : "Failed to load diff",
       });
     }
-  }, [dispatch]);
+  }, [dispatch, loadView]);
 
   useEffect(() => {
     if (files.length > 0) {
@@ -141,31 +216,37 @@ function AppContent() {
   }, [files, dispatch, selectedFile]);
 
   useEffect(() => {
-    loadDiff();
-  }, [loadDiff]);
+    init();
+  }, [init]);
 
-  const handleModeChange = useCallback(
-    async (newMode: DiffMode) => {
-      try {
-        await changeDiffMode(newMode);
-        setDiffState((prev) => ({ ...prev, mode: newMode }));
-        await loadDiff();
-      } catch (err) {
-        dispatchAsync({
-          type: "LOAD_ERROR",
-          error: err instanceof Error ? err.message : "Failed to change mode",
-        });
-      }
+  const handleStagedChange = useCallback(
+    (nextStaged: boolean) => {
+      setStaged(nextStaged);
+      if (session) loadView(session.launch, nextStaged);
     },
-    [loadDiff],
+    [session, loadView],
+  );
+
+  const handleLoadFile = useCallback(
+    (path: string, priority?: boolean) => fileQueue.request(path, priority),
+    [fileQueue],
   );
 
   const handleExportReview = useCallback(async () => {
+    if (!session) return;
     dispatchAsync({ type: "EXPORT_START" });
     try {
       const reviewState: ReviewState = {
         timestamp: new Date().toISOString(),
-        source: state.source ?? { type: "local", mode: diffState.mode },
+        // A saved review keeps its source and revision, with pending reviews
+        // following the staged toggle. New reviews use the view shown.
+        // The server adds `head`/`commit` if absent.
+        source:
+          session.reviewLoaded && state.source
+            ? state.source.type === "pending" && session.launch.type === "pending"
+              ? { ...state.source, staged }
+              : state.source
+            : viewSource(session.launch, staged),
         files: Object.values(state.files),
       };
       const result = await submitReview(reviewState);
@@ -178,9 +259,17 @@ function AppContent() {
     } finally {
       dispatchAsync({ type: "EXPORT_END" });
     }
-  }, [state, diffState.mode]);
+  }, [state, session, staged]);
 
   const filePaths = useMemo(() => files.map((f) => f.name), [files]);
+
+  const viewerContent = useMemo<ViewerContent>(
+    () =>
+      view?.kind === "folder"
+        ? { kind: "folder", paths: filePaths, files: folderFiles, onLoadFile: handleLoadFile }
+        : { kind: "diff", patch: view?.patch ?? "" },
+    [view, filePaths, folderFiles, handleLoadFile],
+  );
 
   const handleSelectFile = useCallback((filePath: string) => {
     setSelectedFile(filePath);
@@ -193,9 +282,25 @@ function AppContent() {
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
 
+  if (async.error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-bg">
+        <div className="text-center max-w-md">
+          <p className="text-danger text-sm font-medium">Error</p>
+          <p className="text-muted text-xs mt-2">{async.error}</p>
+          <div className="mt-4">
+            <Button onClick={() => (session ? loadView(session.launch, staged) : init())}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Full-screen loader only while there is nothing to show yet: on a reload the
   // UI stays mounted so the reader keeps their scroll position.
-  if (async.loading && !diffState.patch) {
+  if (!session || !view) {
     return (
       <div className="flex items-center justify-center h-screen bg-bg">
         <div className="flex flex-col items-center gap-3">
@@ -206,34 +311,23 @@ function AppContent() {
     );
   }
 
-  if (async.error) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-bg">
-        <div className="text-center max-w-md">
-          <p className="text-danger text-sm font-medium">Error</p>
-          <p className="text-muted text-xs mt-2">{async.error}</p>
-          <div className="mt-4">
-            <Button onClick={loadDiff}>Retry</Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <CollapseProvider filePaths={filePaths} reviewFiles={state.files}>
+    <CollapseProvider
+      filePaths={filePaths}
+      reviewFiles={state.files}
+      collapsedByDefault={session.launch.type === "folder"}
+    >
       <Layout
         sidebarCollapsed={sidebarCollapsed}
         toolbar={
           <Toolbar
-            mode={diffState.mode}
-            branch={diffState.branch}
-            baseBranch={diffState.baseBranch}
+            source={viewSource(session.launch, staged)}
+            branch={view.kind === "diff" ? view.branch : ""}
             sidebarCollapsed={sidebarCollapsed}
             reviewedCount={reviewedCount}
             totalFiles={files.length}
             onToggleSidebar={toggleSidebar}
-            onModeChange={handleModeChange}
+            onStagedChange={handleStagedChange}
             onExportReview={handleExportReview}
             exporting={async.exporting}
           />
@@ -244,13 +338,14 @@ function AppContent() {
             reviewFiles={state.files}
             selectedFile={selectedFile}
             onSelectFile={handleSelectFile}
+            skipped={view.kind === "folder" ? view.skipped : undefined}
           />
         }
       >
         <ErrorBoundary>
           <DiffViewer
-            patch={diffState.patch}
-            diffKey={`${diffState.mode}:${diffState.branch}:${diffState.baseBranch}`}
+            content={viewerContent}
+            diffKey={view.kind === "diff" ? `${staged}:${view.branch}` : "folder"}
             navigationTargetFile={navigationTargetFile}
             reviewFiles={state.files}
             onNavigationHandled={handleNavigationHandled}

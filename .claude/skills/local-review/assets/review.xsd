@@ -7,10 +7,14 @@
   validation against this schema.
 
   Usage reference:
-    <source type="local">      requires: mode
-    <source type="github-pr">  requires: owner, repo, pr
-    <source type="gitlab-mr">  requires: project, mr
+    <source type="branch">     requires: base
+    <source type="pending">    requires: staged
+    <source type="folder">     requires: path (absolute folder root)
+    <source type="github-pr">  requires: owner, repo, pr;  optional: base (target branch)
+    <source type="gitlab-mr">  requires: project, mr;     optional: base (target branch)
     <source type="agent">      optional: agent (name of the reviewing agent)
+  Every type except folder also takes optional head (branch reviewed) and
+  commit (SHA of HEAD), which the skill checks before open/apply.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
@@ -28,32 +32,33 @@
 
   <!-- ===== Source (polymorphic via 'type' attribute) ===== -->
   <!--
-    When type="local":     mode is required; owner/repo/pr/project/mr are absent.
-    When type="github-pr": owner, repo, pr are required; mode/project/mr are absent.
-    When type="gitlab-mr": project, mr are required; mode/owner/repo/pr are absent.
-    When type="agent":    agent is optional (name of the reviewing agent).
+    When type="branch":    base is required.
+    When type="pending":   staged is required.
+    When type="folder":    path is required; head/commit are absent.
+    When type="github-pr": owner, repo, pr are required; base is optional.
+    When type="gitlab-mr": project, mr are required; base is optional.
+    When type="agent":     agent is optional (name of the reviewing agent).
+    Attributes of other types are absent.
   -->
   <xs:complexType name="SourceType">
     <xs:attribute name="type" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:string">
-          <xs:enumeration value="local"/>
+          <xs:enumeration value="branch"/>
+          <xs:enumeration value="pending"/>
+          <xs:enumeration value="folder"/>
           <xs:enumeration value="github-pr"/>
           <xs:enumeration value="gitlab-mr"/>
           <xs:enumeration value="agent"/>
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
-    <!-- local -->
-    <xs:attribute name="mode">
-      <xs:simpleType>
-        <xs:restriction base="xs:string">
-          <xs:enumeration value="unstaged"/>
-          <xs:enumeration value="staged"/>
-          <xs:enumeration value="branch"/>
-        </xs:restriction>
-      </xs:simpleType>
-    </xs:attribute>
+    <!-- branch (compared base), github-pr / gitlab-mr (target branch) -->
+    <xs:attribute name="base"   type="xs:string"/>
+    <!-- pending -->
+    <xs:attribute name="staged" type="xs:boolean"/>
+    <!-- folder -->
+    <xs:attribute name="path"   type="xs:string"/>
     <!-- github-pr -->
     <xs:attribute name="owner"  type="xs:string"/>
     <xs:attribute name="repo"   type="xs:string"/>
@@ -63,6 +68,15 @@
     <xs:attribute name="mr"      type="xs:positiveInteger"/>
     <!-- agent -->
     <xs:attribute name="agent"  type="xs:string"/>
+    <!-- revision reviewed (all types except folder) -->
+    <xs:attribute name="head"   type="xs:string"/>
+    <xs:attribute name="commit">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:pattern value="[0-9a-f]{40}"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
   </xs:complexType>
 
   <!-- ===== Files container ===== -->
@@ -99,6 +113,8 @@
         <line> is omitted for file-level comments (line = null in ReviewComment).
         When present it is a self-closing element, e.g.:
           <line number="42" side="addition" />
+        or, for a raw file line in a folder review (no side):
+          <line number="42" />
       -->
       <xs:element name="line"       type="LineType" minOccurs="0"/>
       <xs:element name="body"       type="xs:string"/>
@@ -117,7 +133,8 @@
   <!-- ===== Line (self-closing) ===== -->
   <xs:complexType name="LineType">
     <xs:attribute name="number" type="xs:positiveInteger" use="required"/>
-    <xs:attribute name="side" use="required">
+    <!-- Omitted for folder reviews, where number is a raw file line. -->
+    <xs:attribute name="side">
       <xs:simpleType>
         <xs:restriction base="xs:string">
           <xs:enumeration value="addition"/>

@@ -1,6 +1,6 @@
 // Git operations using Bun.spawn
 
-import type { DiffMode } from "../shared/types";
+import type { DiffSource } from "../shared/types";
 
 /** Run a shell command and return its stdout. */
 async function run(cmd: string[], cwd?: string, allowedExitCodes: number[] = [0]): Promise<string> {
@@ -78,32 +78,66 @@ export async function getBaseBranch(cwd?: string): Promise<string> {
   }
 }
 
-/** Run git diff with the given mode and return raw patch text. */
+/** SHA of `HEAD`, or undefined when the repository has no commits yet. */
+export async function getHeadCommit(cwd?: string): Promise<string | undefined> {
+  try {
+    return await run(["git", "rev-parse", "HEAD"], cwd);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Checked-out branch and `HEAD` commit, each absent when git can't tell
+ *  (detached `HEAD`, no commits yet, not a repository). */
+export interface Checkout {
+  branch?: string;
+  commit?: string;
+}
+
+export async function getCheckout(cwd?: string): Promise<Checkout> {
+  const [branch, commit] = await Promise.all([
+    // `symbolic-ref -q` fails on a detached `HEAD` instead of printing "HEAD".
+    run(["git", "symbolic-ref", "--short", "-q", "HEAD"], cwd).catch(() => undefined),
+    getHeadCommit(cwd),
+  ]);
+  return { branch: branch || undefined, commit };
+}
+
+/** Branch → worktree path, from `git worktree list --porcelain`. Detached and
+ *  bare worktrees have no branch and are left out. */
+export function parseWorktreeList(porcelain: string): Map<string, string> {
+  const worktrees = new Map<string, string>();
+  for (const block of porcelain.split(/\n\s*\n/)) {
+    const path = block.match(/^worktree (.+)$/m)?.[1];
+    const branch = block.match(/^branch refs\/heads\/(.+)$/m)?.[1];
+    if (path && branch) worktrees.set(branch, path);
+  }
+  return worktrees;
+}
+
+export async function findWorktree(branch: string, cwd?: string): Promise<string | undefined> {
+  try {
+    return parseWorktreeList(await run(["git", "worktree", "list", "--porcelain"], cwd)).get(
+      branch,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/** Run git diff for a branch or pending source and return raw patch text. */
 export async function getGitDiff(
-  mode: DiffMode,
+  source: Extract<DiffSource, { type: "branch" | "pending" }>,
   extraArgs: string[] = [],
   cwd?: string,
 ): Promise<string> {
   const args = ["git", "diff"];
-
-  switch (mode) {
-    case "unstaged":
-      // Default git diff (working tree vs index)
-      break;
-    case "staged":
-      args.push("--cached");
-      break;
-    case "branch": {
-      const base = await getBaseBranch(cwd);
-      args.push(`${base}...HEAD`);
-      break;
-    }
-  }
-
+  if (source.type === "branch") args.push(`${source.base}...HEAD`);
+  else if (source.staged) args.push("--cached");
   args.push(...extraArgs);
 
   try {
-    if (mode === "unstaged") {
+    if (source.type === "pending" && !source.staged) {
       const [trackedPatch, untrackedPatch] = await Promise.all([
         run(args, cwd),
         getUntrackedPatch(cwd),
@@ -114,9 +148,14 @@ export async function getGitDiff(
     return await run(args, cwd);
   } catch (err) {
     // If branch mode fails (e.g. no commits), fall back to unstaged
-    if (mode === "branch") {
+    if (source.type === "branch") {
       return run(["git", "diff", ...extraArgs], cwd);
     }
     throw err;
   }
+}
+
+/** Whether the working tree has any change, tracked or not. */
+export async function hasPendingChanges(cwd?: string): Promise<boolean> {
+  return (await run(["git", "status", "--porcelain"], cwd)) !== "";
 }

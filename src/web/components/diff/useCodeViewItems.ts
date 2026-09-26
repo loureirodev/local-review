@@ -1,14 +1,24 @@
-import type { CodeViewItem, DiffLineAnnotation, FileDiffMetadata } from "@pierre/diffs/react";
+import type {
+  CodeViewItem,
+  DiffLineAnnotation,
+  FileContents,
+  LineAnnotation,
+} from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useCallback, useMemo, useRef } from "react";
-import type { CommentAnnotation } from "./diffParsing";
-import { EMPTY_ANNOTATIONS } from "./diffParsing";
+import type {
+  CommentAnnotation,
+  CommentLineAnnotation,
+  FolderFileState,
+  ViewerEntry,
+} from "./diffParsing";
+import { EMPTY_ANNOTATIONS, entryName } from "./diffParsing";
 
 export type DiffCodeViewItem = CodeViewItem<CommentAnnotation>;
 
 interface UseCodeViewItemsParams {
-  allFileDiffs: FileDiffMetadata[];
-  lineAnnotationsByFile: Map<string, DiffLineAnnotation<CommentAnnotation>[]>;
+  entries: ViewerEntry[];
+  lineAnnotationsByFile: Map<string, CommentLineAnnotation[]>;
   fileLevelCommentsByFile: Map<string, ReviewComment[]>;
   reviewFiles: Record<string, FileReviewState>;
   getIsCollapsed: (filePath: string) => boolean;
@@ -96,40 +106,67 @@ export function nextVersionMap(
   return { versions, emitted };
 }
 
+/** Render identity of an entry's content, folded into its signature. */
+export function contentSig(entry: ViewerEntry | undefined): string {
+  if (!entry) return "none";
+  if (entry.type === "file") {
+    // Folder contents are fetched once per session and never change after,
+    // so the load state and length identify them without hashing.
+    const file = entry.file;
+    if (!file) return `file:${entry.name}:pending`;
+    return file.status === "loaded"
+      ? `file:${entry.name}:loaded:${file.content.length}`
+      : `file:${entry.name}:error:${file.message}`;
+  }
+  // Content identity: the git blob ids from the patch's `index` line pin the
+  // exact before/after contents. Line counts are the fallback for patches
+  // without them — hunk count alone missed edits that reshape a hunk in place.
+  const fd = entry.fileDiff;
+  return `${fd.name}:${fd.type}:${fd.prevObjectId ?? "-"}:${fd.newObjectId ?? "-"}:${fd.hunks.length}:${fd.unifiedLineCount}:${fd.splitLineCount}`;
+}
+
+/** What a folder file item renders: its text, a placeholder while loading, or
+ *  the reason it cannot be shown (plain text, so it isn't highlighted as code). */
+export function fileContents(name: string, file: FolderFileState | undefined): FileContents {
+  if (!file) return { name, contents: "", lang: "text" };
+  if (file.status === "error") return { name, contents: file.message, lang: "text" };
+  return { name, contents: file.content };
+}
+
 /**
- * Maps `FileDiffMetadata[]` to CodeView items and owns the per-item `version`
- * signature (D4). Render-affecting state (collapsed, viewed, comments, and the
- * underlying diff content) is folded into a string `sig`; when an item's `sig`
- * changes, its `version` is bumped and the item is re-emitted so the viewer can
- * refresh only that item via `updateItem` without recreating the list (D2).
+ * Maps viewer entries (file diffs, or raw folder files) to CodeView items and
+ * owns the per-item `version` signature (D4). Render-affecting state (collapsed,
+ * viewed, comments, and the underlying content) is folded into a string `sig`;
+ * when it changes, `version` is bumped and the item re-emitted so the viewer
+ * refreshes only that item via `updateItem` without recreating the list (D2).
  */
 export function useCodeViewItems({
-  allFileDiffs,
+  entries,
   lineAnnotationsByFile,
   fileLevelCommentsByFile,
   reviewFiles,
   getIsCollapsed,
 }: UseCodeViewItemsParams): CodeViewItemsResult {
-  const fileDiffById = useMemo(() => {
-    const map = new Map<string, FileDiffMetadata>();
-    for (const fd of allFileDiffs) map.set(fd.name, fd);
+  const entryById = useMemo(() => {
+    const map = new Map<string, ViewerEntry>();
+    for (const entry of entries) map.set(entryName(entry), entry);
     return map;
-  }, [allFileDiffs]);
+  }, [entries]);
 
-  const filesKey = useMemo(() => allFileDiffs.map((fd) => fd.name).join("\n"), [allFileDiffs]);
+  const filesKey = useMemo(() => entries.map(entryName).join("\n"), [entries]);
 
   // Latest render inputs, read by the sig/item builders (which run inside an
   // effect, after render). Keeps the builders pointed at fresh data without
   // recreating callbacks on every keystroke.
   const latest = useRef({
-    fileDiffById,
+    entryById,
     lineAnnotationsByFile,
     fileLevelCommentsByFile,
     reviewFiles,
     getIsCollapsed,
   });
   latest.current = {
-    fileDiffById,
+    entryById,
     lineAnnotationsByFile,
     fileLevelCommentsByFile,
     reviewFiles,
@@ -140,13 +177,13 @@ export function useCodeViewItems({
 
   const computeSig = useCallback((id: string): string => {
     const {
-      fileDiffById: byId,
+      entryById: byId,
       lineAnnotationsByFile: lineMap,
       fileLevelCommentsByFile: fileMap,
       reviewFiles: review,
       getIsCollapsed: isCollapsed,
     } = latest.current;
-    const fileDiff = byId.get(id);
+    const entry = byId.get(id);
     const collapsed = isCollapsed(id) ? 1 : 0;
     const viewed = review[id]?.viewed ? 1 : 0;
 
@@ -162,28 +199,33 @@ export function useCodeViewItems({
       for (const comment of fileComments) parts.push(commentSig(comment));
     }
 
-    // Content identity: the git blob ids from the patch's `index` line pin the
-    // exact before/after contents. Line counts are the fallback for patches
-    // without them — hunk count alone missed edits that reshape a hunk in place.
-    const fileDiffSig = fileDiff
-      ? `${fileDiff.name}:${fileDiff.type}:${fileDiff.prevObjectId ?? "-"}:${fileDiff.newObjectId ?? "-"}:${fileDiff.hunks.length}:${fileDiff.unifiedLineCount}:${fileDiff.splitLineCount}`
-      : "none";
-    return `${collapsed}|${viewed}|${fileDiffSig}|${parts.join(",")}`;
+    return `${collapsed}|${viewed}|${contentSig(entry)}|${parts.join(",")}`;
   }, []);
 
   const buildItem = useCallback((id: string, version: number): DiffCodeViewItem | undefined => {
     const {
-      fileDiffById: byId,
+      entryById: byId,
       lineAnnotationsByFile: lineMap,
       getIsCollapsed: isCollapsed,
     } = latest.current;
-    const fileDiff = byId.get(id);
-    if (!fileDiff) return undefined;
+    const entry = byId.get(id);
+    if (!entry) return undefined;
+    const annotations = lineMap.get(id) ?? EMPTY_ANNOTATIONS;
+    if (entry.type === "diff") {
+      return {
+        id,
+        type: "diff",
+        fileDiff: entry.fileDiff,
+        annotations: annotations as DiffLineAnnotation<CommentAnnotation>[],
+        collapsed: isCollapsed(id),
+        version,
+      };
+    }
     return {
       id,
-      type: "diff",
-      fileDiff,
-      annotations: lineMap.get(id) ?? EMPTY_ANNOTATIONS,
+      type: "file",
+      file: fileContents(id, entry.file),
+      annotations: annotations as LineAnnotation<CommentAnnotation>[],
       collapsed: isCollapsed(id),
       version,
     };
@@ -199,7 +241,7 @@ export function useCodeViewItems({
   // reconcile would compare a signature against itself and never bump the
   // version — leaving edited files rendering their stale contents.
   const initialItems = useMemo(() => {
-    const ids = allFileDiffs.map((fd) => fd.name);
+    const ids = entries.map(entryName);
     const versions = seedMissingVersions(ids, computeSig, versionRef.current);
     const items: DiffCodeViewItem[] = [];
     ids.forEach((id, index) => {
@@ -207,7 +249,7 @@ export function useCodeViewItems({
       if (item) items.push(item);
     });
     return items;
-  }, [allFileDiffs, computeSig, buildItem]);
+  }, [entries, computeSig, buildItem]);
 
   const collectUpdatedItems = useCallback((): DiffCodeViewItem[] => {
     const versions = versionRef.current;
@@ -224,9 +266,9 @@ export function useCodeViewItems({
   }, [computeSig, buildItem]);
 
   const buildAllItems = useCallback((): DiffCodeViewItem[] => {
-    // `fileDiffById` is insertion-ordered, so this walks the files in tree
+    // `entryById` is insertion-ordered, so this walks the files in tree
     // order — the order `setItems` will apply.
-    const ids = [...latest.current.fileDiffById.keys()];
+    const ids = [...latest.current.entryById.keys()];
     const { versions, emitted } = nextVersionMap(ids, computeSig, versionRef.current);
     const items: DiffCodeViewItem[] = [];
     ids.forEach((id, index) => {

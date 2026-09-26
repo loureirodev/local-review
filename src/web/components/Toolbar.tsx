@@ -1,42 +1,93 @@
-import type { DiffMode } from "@shared/types.js";
+import type { LaunchSource } from "@shared/types.js";
 import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { Button, IconButton, SegmentedControl } from "./Button";
-import { BranchIcon, ExportIcon, ICON_SIZE_INLINE, SidebarIcon, ThemeIcon } from "./icons";
+import {
+  BranchIcon,
+  ExportIcon,
+  FolderIcon,
+  ICON_SIZE_INLINE,
+  SidebarIcon,
+  ThemeIcon,
+} from "./icons";
 import SettingsPopover from "./SettingsPopover";
 
 interface ToolbarProps {
-  mode: DiffMode;
+  /** Launch mode, with the pending view currently shown. */
+  source: LaunchSource;
+  /** Current branch; unused in folder mode. */
   branch: string;
-  baseBranch: string;
   sidebarCollapsed: boolean;
   reviewedCount: number;
   totalFiles: number;
   onToggleSidebar: () => void;
-  onModeChange: (mode: DiffMode) => void;
+  onStagedChange: (staged: boolean) => void;
   onExportReview: () => void;
   exporting: boolean;
 }
 
-const modeLabels: Record<DiffMode, string> = {
-  unstaged: "Unstaged",
-  staged: "Staged",
-  branch: "Branch",
-};
+const PENDING_VIEWS = [
+  { value: "unstaged", label: "Unstaged" },
+  { value: "staged", label: "Staged" },
+] as const;
 
 function Divider() {
   return <div className="h-4 w-px bg-hair mx-1" />;
 }
 
-export default function Toolbar({
-  mode,
+function SourceInfo({
+  source,
   branch,
-  baseBranch,
+  onStagedChange,
+}: Pick<ToolbarProps, "source" | "branch" | "onStagedChange">) {
+  if (source.type === "folder") {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-1.5 text-xs text-muted min-w-0"
+        title={source.path}
+      >
+        <FolderIcon size={ICON_SIZE_INLINE} />
+        <span className="font-medium text-text truncate">{source.path}</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5 px-1.5 text-xs text-muted">
+        <BranchIcon size={ICON_SIZE_INLINE} />
+        <span className="font-medium text-text">{branch}</span>
+        {source.type === "branch" ? (
+          <span className="text-faint">
+            {"→ "}
+            <span className="text-muted">{source.base}</span>
+          </span>
+        ) : null}
+      </div>
+
+      {source.type === "pending" ? (
+        <>
+          <Divider />
+          <SegmentedControl
+            aria-label="Pending changes view"
+            value={source.staged ? "staged" : "unstaged"}
+            options={PENDING_VIEWS}
+            onChange={(view) => onStagedChange(view === "staged")}
+          />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+export default function Toolbar({
+  source,
+  branch,
   sidebarCollapsed,
   reviewedCount,
   totalFiles,
   onToggleSidebar,
-  onModeChange,
+  onStagedChange,
   onExportReview,
   exporting,
 }: ToolbarProps) {
@@ -51,7 +102,7 @@ export default function Toolbar({
   return (
     <header className="flex items-center h-10 px-1 bg-panel border-b border-hair flex-shrink-0 z-20">
       {/* ── Left zone ── */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5 min-w-0">
         {/* Sidebar toggle */}
         <IconButton
           onClick={onToggleSidebar}
@@ -63,30 +114,7 @@ export default function Toolbar({
 
         <Divider />
 
-        {/* Branch info */}
-        <div className="flex items-center gap-1.5 px-1.5 text-xs text-muted">
-          <BranchIcon size={ICON_SIZE_INLINE} />
-          <span className="font-medium text-text">{branch}</span>
-          {mode === "branch" ? (
-            <span className="text-faint">
-              {"→ "}
-              <span className="text-muted">{baseBranch}</span>
-            </span>
-          ) : null}
-        </div>
-
-        <Divider />
-
-        {/* Diff mode selector */}
-        <SegmentedControl
-          aria-label="Diff mode"
-          value={mode}
-          options={(Object.keys(modeLabels) as DiffMode[]).map((m) => ({
-            value: m,
-            label: modeLabels[m],
-          }))}
-          onChange={onModeChange}
-        />
+        <SourceInfo source={source} branch={branch} onStagedChange={onStagedChange} />
       </div>
 
       {/* ── Spacer ── */}

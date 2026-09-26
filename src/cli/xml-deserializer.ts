@@ -1,12 +1,6 @@
 // XML deserializer: XML → ReviewState (inverse of xml-serializer.ts)
 
-import type {
-  DiffMode,
-  DiffSource,
-  FileReviewState,
-  ReviewComment,
-  ReviewState,
-} from "../shared/types";
+import type { DiffSource, FileReviewState, ReviewComment, ReviewState } from "../shared/types";
 
 function unescapeXml(str: string): string {
   return str
@@ -23,7 +17,8 @@ function getTagContent(xml: string, tag: string): string | null {
 }
 
 function getAttr(tag: string, attr: string): string | null {
-  const match = tag.match(new RegExp(`${attr}="([^"]*)"`));
+  // Anchored on whitespace so `base` can't match inside another attribute name.
+  const match = tag.match(new RegExp(`(?:^|\\s)${attr}="([^"]*)"`));
   return match ? unescapeXml(match[1]) : null;
 }
 
@@ -33,9 +28,9 @@ function parseComment(commentXml: string): ReviewComment {
   const body = getTagContent(commentXml, "body") ?? "";
   const createdAt = getTagContent(commentXml, "created-at") ?? "";
 
-  const lineMatch = commentXml.match(/<line number="(\d+)" side="([^"]*)"\s*\/>/);
+  const lineMatch = commentXml.match(/<line number="(\d+)"(?: side="(addition|deletion)")?\s*\/>/);
   const line = lineMatch ? parseInt(lineMatch[1], 10) : null;
-  const side = lineMatch ? (lineMatch[2] as "addition" | "deletion") : null;
+  const side = (lineMatch?.[2] as "addition" | "deletion" | undefined) ?? null;
 
   const url = getTagContent(commentXml, "url") ?? undefined;
   const edited = getAttr(commentXml, "edited") === "true" ? true : undefined;
@@ -45,38 +40,45 @@ function parseComment(commentXml: string): ReviewComment {
 
 function parseSource(xml: string): DiffSource {
   const sourceMatch = xml.match(/<source ([^>]*?)\s*\/>/);
-  if (!sourceMatch) return { type: "local", mode: "unstaged" };
+  if (!sourceMatch) return { type: "pending", staged: false };
 
   const tag = sourceMatch[1];
-  const type = getAttr(tag, "type") ?? "local";
+  const optional = (attr: string) => getAttr(tag, attr) ?? undefined;
+  const ref = { head: optional("head"), commit: optional("commit") };
 
-  if (type === "github-pr") {
-    return {
-      type: "github-pr",
-      owner: getAttr(tag, "owner") ?? "",
-      repo: getAttr(tag, "repo") ?? "",
-      pr: parseInt(getAttr(tag, "pr") ?? "0", 10),
-    };
+  switch (getAttr(tag, "type")) {
+    case "branch":
+      return { type: "branch", base: getAttr(tag, "base") ?? "", ...ref };
+    case "folder":
+      return { type: "folder", path: getAttr(tag, "path") ?? "" };
+    case "github-pr":
+      return {
+        type: "github-pr",
+        owner: getAttr(tag, "owner") ?? "",
+        repo: getAttr(tag, "repo") ?? "",
+        pr: parseInt(getAttr(tag, "pr") ?? "0", 10),
+        base: optional("base"),
+        ...ref,
+      };
+    case "gitlab-mr":
+      return {
+        type: "gitlab-mr",
+        project: getAttr(tag, "project") ?? "",
+        mr: parseInt(getAttr(tag, "mr") ?? "0", 10),
+        base: optional("base"),
+        ...ref,
+      };
+    case "agent":
+      return { type: "agent", agent: optional("agent"), ...ref };
+    default:
+      return { type: "pending", staged: getAttr(tag, "staged") === "true", ...ref };
   }
-  if (type === "gitlab-mr") {
-    return {
-      type: "gitlab-mr",
-      project: getAttr(tag, "project") ?? "",
-      mr: parseInt(getAttr(tag, "mr") ?? "0", 10),
-    };
-  }
+}
 
-  if (type === "agent") {
-    return {
-      type: "agent",
-      agent: getAttr(tag, "agent") ?? undefined,
-    };
-  }
-
-  return {
-    type: "local",
-    mode: (getAttr(tag, "mode") ?? "unstaged") as DiffMode,
-  };
+/** Written before 0.4 (`<source type="local" mode="...">`). Still parsed — as
+ *  pending changes — but its mode and revision are lost. */
+export function isLegacyReview(xml: string): boolean {
+  return /<source\s[^>]*type="local"/.test(xml);
 }
 
 export function deserializeReview(xml: string): ReviewState {

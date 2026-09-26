@@ -21,7 +21,7 @@ local-review ships an agent skill that automates the import and apply steps. Com
 |---------|-------------|
 | `/local-review import <URL>` | Fetch comments from a GitHub PR or GitLab MR and write `review.xml` |
 | `/local-review apply` | Read `review.xml` and apply suggestions / instructions to the working tree |
-| `/local-review open` | Launch the review UI in the browser |
+| `/local-review open` | Launch the review UI in the browser (`--existing` checks the review's branch first) |
 | `/local-review help` | Show all available options |
 
 ### Setup
@@ -86,6 +86,10 @@ The skill handles three types of comment bodies:
 
 Changes are applied to the working tree only — no automatic `git add` or `git commit`.
 
+### Branch check
+
+`review.xml` records the branch and commit it was made on (`head` and `commit` on `<source>`; PR/MR imports take them from the forge). The CLI compares them with your checkout (see [Standalone Usage](#standalone-usage)); before `open --existing` or `apply` the skill runs `local-review check --json`, and on a branch mismatch asks whether to continue, switch to the review's branch, or cancel — before the UI starts or any file is edited. It never stashes or discards local changes without asking.
+
 ### XML schema reference
 
 The `review.xml` format is documented by the XSD schema bundled with the skill at `.claude/skills/local-review/assets/review.xsd`.
@@ -105,42 +109,67 @@ Also available from GitHub Packages — configure `.npmrc` first:
 ### Requirements
 
 - [Bun](https://bun.sh) runtime (the CLI runs on Bun)
-- A git repository
+- A git repository (not needed for `--folder`)
 
 ## Standalone Usage
 
 The review UI can also be used directly from the CLI, without the agent skill:
 
+The mode is chosen at launch and fixed for the session:
+
 ```bash
-# Review unstaged changes
+# Review pending changes (Unstaged | Staged toggle in the UI)
 local-review
 
-# Review staged changes
-local-review --mode staged
-
 # Review all changes in current branch vs base (main/master/develop)
-local-review --mode branch
+local-review --branch
 
-# Load a previously saved review
+# ...or vs an explicit base
+local-review --branch develop
+
+# Review the files of a folder (no diff; works outside a git repo)
+local-review --folder ./docs
+
+# Load a previously saved review (the mode comes from the review)
 local-review --existing
+
+# Check review.xml against the checkout without launching
+local-review check --json
 ```
+
+With `--existing`, the CLI checks the review against your checkout before starting:
+
+- **Different branch:** in a terminal it asks `Open it anyway? [y/N]`; without one (agents, scripts, CI) it exits with status 3. `--no-check` skips the check.
+- **Same branch, different commit:** a warning; lines may be offset.
+- **Folder review whose folder is gone:** treated like a different branch.
+
+`local-review check` runs the same comparison and exits `0` (ok), `3` (blocked) or `1` (no review file).
+
+In folder mode binaries and files over 1 MB are left out of the listing, and `.gitignore` is not applied.
 
 ### CLI Options
 
 ```
+Modes (fixed for the session):
+  (default)            Pending changes, with an Unstaged | Staged toggle in the UI
+  --branch [base]      Current branch vs <base> (default: main, master or develop)
+  --folder <path>      Review the files of a folder; no git repository needed
+
 Options:
   --port <port>        Port to listen on (default: random available port)
   --no-open            Don't open the browser automatically
   --output-file <file> Output file for review XML (default: ./review.xml)
-  --mode <mode>        Diff mode: unstaged, staged, branch (default: unstaged)
-  --existing           Load existing review.xml on startup
+  --existing           Load existing review.xml on startup (mode taken from it)
+  --no-check           With --existing, skip the branch check
+  --json               Print the branch check result as JSON; never prompts
+  --theme <theme>      Force the theme for this session: light, dark
   -h, --help           Show this help message
   -v, --version        Show version number
 ```
 
 ## Features
 
-- **Three diff modes**: Unstaged, staged, or full branch diffs
+- **Three launch modes**: pending changes (unstaged/staged), full branch diffs, or a folder's files
 - **Syntax highlighting**: Powered by Shiki with 300+ language grammars
 - **Split & unified views**: Toggle between side-by-side and unified diff
 - **Line-level & file-level comments**: Add comments to specific lines or entire files
@@ -152,10 +181,8 @@ Options:
 
 ## Future
 
-- Performance optimizations for large diffs
 - Markdown support in comments
 - Keyboard shortcuts for navigation
-- Light/dark theme toggle
 
 ## Contributing
 
