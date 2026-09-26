@@ -51,9 +51,12 @@ The `_discussion` bucket, if present, goes last.
 <?xml version="1.0" encoding="UTF-8"?>
 <review>
   <timestamp><current-ISO-datetime></timestamp>
-  <source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>" />
-  <!-- OR: <source type="gitlab-mr" project="<project>" mr="<number>" /> -->
-  <!-- OR: <source type="agent" /> -->
+  <source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>"
+          base="<target-branch>" head="<head-branch>" commit="<head-sha>" />
+  <!-- OR: <source type="gitlab-mr" project="<project>" mr="<number>" base="..." head="..." commit="..." /> -->
+  <!-- OR: <source type="agent" head="<branch>" commit="<sha>" /> -->
+  <!-- Written by the UI: type="branch" base="...", type="pending" staged="true|false",
+       type="folder" path="<absolute-path>" -->
   <files>
     <file path="<path>" viewed="false">
       <comment id="gh-123">
@@ -78,13 +81,19 @@ Cross-check the generated XML against [../assets/review.xsd](../assets/review.xs
 
 - Root element is `<review>`.
 - `<timestamp>` present and non-empty.
-- `<source>` has a valid `type` attribute (`local`, `github-pr`, `gitlab-mr`, or `agent`).
-- `type="github-pr"`: `owner`, `repo`, and `pr` (integer) are present.
-- `type="gitlab-mr"`: `project` and `mr` (integer) are present.
+- `<source>` has a valid `type` attribute (`branch`, `pending`, `folder`,
+  `github-pr`, `gitlab-mr`, or `agent`). There is no `local` type any more.
+- `type="branch"`: `base` is present. `type="pending"`: `staged` is `true`/`false`.
+  `type="folder"`: `path` is present.
+- `type="github-pr"`: `owner`, `repo`, and `pr` (integer) are present; `base` optional.
+- `type="gitlab-mr"`: `project` and `mr` (integer) are present; `base` optional.
 - `type="agent"`: `agent` is optional (string).
+- `head` (branch) and `commit` (40-char hex SHA) are optional on every type
+  except `folder`. Always write them on import when known.
 - Each `<comment>` has `id` attribute plus `<file>`, `<body>`, `<created-at>` children.
 - `<url>` is optional; when present it must be a valid URL.
-- `<line>` when present has `number` (positive integer) and `side` (`"addition"` or `"deletion"`).
+- `<line>` when present has `number` (positive integer) and, for diff reviews,
+  `side` (`"addition"` or `"deletion"`). Folder reviews omit `side`.
 - `viewed` on `<file>` is `"true"` or `"false"`.
 
 Fix any structural error before writing.
@@ -107,5 +116,6 @@ Import complete — review.xml written to <output-path>
   Unresolved:     <N>  (stored under _discussion)
 
 To view in local-review:
-  local-review --output-file <output-path> --existing
+  local-review --output-file <output-path> --existing --branch <base>
+  (or `open --existing` with this skill, which checks the branch first)
 ```

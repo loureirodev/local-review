@@ -1,14 +1,25 @@
 # apply — full workflow
 
+## Step 0 — Check the branch
+
+Run [branch-check.md](branch-check.md) (`local-review check --json`) before
+touching any file. If it ends in cancel or a stop, do not edit anything. If it
+moved to a worktree, every edit below happens inside that worktree.
+
 ## Step 1 — Read review.xml
 
 Read the file at `--input` path (default: `./review.xml`).
+
+If `<source type="folder" path="...">`, file paths in the review are relative
+to that folder, not to the repository: resolve each `filePath` as
+`<path>/<filePath>`.
 
 Parse the XML to extract all `<comment>` elements. For each, collect:
 - `id` — attribute on `<comment>`
 - `filePath` — text content of `<file>` child
 - `line` — `number` attribute of `<line>` child, or `null` if `<line>` absent
-- `side` — `side` attribute of `<line>` child, or `null`
+- `side` — `side` attribute of `<line>` child, or `null` (always absent in
+  folder reviews)
 - `body` — text content of `<body>` child
 - `createdAt` — text content of `<created-at>` child
 
@@ -46,6 +57,9 @@ For each comment in the filtered list, determine the kind of change it requests:
 - Skip. Note as "skipped (no action)".
 
 ### Handling `side` attribute
+
+- No `side` (folder review): `line` is a line of the file as it is on disk.
+  Apply the change at that line directly.
 
 - `side="addition"` (right side of diff): the line number refers to the current
   version of the file. Read the file and apply the change at that line directly.

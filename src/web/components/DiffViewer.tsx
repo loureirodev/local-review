@@ -1,7 +1,6 @@
 import type {
   CodeViewHandle,
   DiffLineAnnotation,
-  FileDiffMetadata,
   LineAnnotation,
   PostRenderPhase,
 } from "@pierre/diffs/react";
@@ -16,16 +15,29 @@ import { IconButton } from "./Button";
 import CommentDisplay from "./CommentDisplay";
 import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay";
 import { HIGHLIGHTER_OPTIONS, THEME, WORKER_POOL_OPTIONS } from "./diff/constants";
-import type { CommentAnnotation } from "./diff/diffParsing";
+import type { CommentAnnotation, FolderFileState, ViewerEntry } from "./diff/diffParsing";
 import { EMPTY_COMMENTS } from "./diff/diffParsing";
 import { FileCommentBadge, HeaderChevron, ViewedToggle } from "./diff/HeaderControls";
 import { type DiffCodeViewItem, useCodeViewItems } from "./diff/useCodeViewItems";
 import { useDiffData } from "./diff/useDiffData";
+import { useFolderData } from "./diff/useFolderData";
 import FileCommentsDrawer from "./FileCommentsDrawer";
 import { ICON_SIZE_INLINE, PlusIcon } from "./icons";
 
+/** What the viewer shows: a git patch, or the files of a folder (folder mode),
+ *  whose contents are requested through `onLoadFile` as files expand. */
+export type ViewerContent =
+  | { kind: "diff"; patch: string }
+  | {
+      kind: "folder";
+      paths: string[];
+      files: Record<string, FolderFileState>;
+      /** `priority` puts the file ahead of those queued (e.g. by "expand all"). */
+      onLoadFile: (path: string, priority?: boolean) => void;
+    };
+
 interface DiffViewerProps {
-  patch: string;
+  content: ViewerContent;
   /** Identity of the diff being viewed (mode + branches). Changing it remounts
    *  the viewer, resetting the scroll — switching to a different diff should
    *  start at the top. Changes to the *contents* of the same diff keep the key
@@ -39,7 +51,8 @@ interface DiffViewerProps {
   onUpdateComment: (filePath: string, commentId: string, body: string) => void;
 }
 
-const EMPTY_FILE_DIFFS: FileDiffMetadata[] = [];
+const EMPTY_PATHS: string[] = [];
+const EMPTY_FOLDER_FILES: Record<string, FolderFileState> = {};
 
 /** Stable across renders on purpose — see `codeViewOptions`. */
 const CODE_VIEW_LAYOUT = { paddingTop: 0, paddingBottom: 0, gap: 0 } as const;
@@ -54,13 +67,12 @@ const NAVIGATION_FLASH_MS = 1400;
  *  the visible timing is the CSS animation's, not this. */
 const NAVIGATION_FLASH_CLEANUP_MS = 5000;
 
-// `getHoveredLine()` returns the file-mode shape (`{ lineNumber }`) or the
-// diff-mode shape (`{ lineNumber, side }`); our items are always diffs, so
-// `side` is present, but we keep it optional to match the union getter type.
+// `getHoveredLine()` returns the file-mode shape (`{ lineNumber }`) for folder
+// items or the diff-mode shape (`{ lineNumber, side }`) for diff items.
 type GutterHoverGetter = () => { lineNumber: number; side?: "additions" | "deletions" } | undefined;
 
 function DiffViewerInner({
-  patch,
+  content,
   diffKey,
   navigationTargetFile,
   reviewFiles,
@@ -77,20 +89,32 @@ function DiffViewerInner({
     toggleViewed,
   } = useReview();
   const { getIsCollapsed, toggleFile } = useCollapse();
+  const folder = content.kind === "folder" ? content : null;
   // `CodeView` takes its theme as a JavaScript value, not a selector, so unlike
   // the file tree it cannot follow `data-theme` on its own.
   const { theme } = useTheme();
 
-  const { allFileDiffs, lineAnnotationsByFile, fileLevelCommentsByFile } = useDiffData(
-    patch,
+  // Both hooks run every render (hooks can't be conditional); the idle one
+  // gets empty input.
+  const diffData = useDiffData(content.kind === "diff" ? content.patch : "", reviewFiles);
+  const folderData = useFolderData(
+    folder?.paths ?? EMPTY_PATHS,
+    folder?.files ?? EMPTY_FOLDER_FILES,
     reviewFiles,
   );
+  const diffEntries = useMemo<ViewerEntry[]>(
+    () => (diffData.allFileDiffs ?? []).map((fileDiff) => ({ type: "diff", fileDiff })),
+    [diffData.allFileDiffs],
+  );
+  const { entries, lineAnnotationsByFile, fileLevelCommentsByFile } = folder
+    ? folderData
+    : { ...diffData, entries: diffEntries };
 
   const codeViewRef = useRef<CodeViewHandle<CommentAnnotation>>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
 
   const { filesKey, initialItems, collectUpdatedItems, buildAllItems } = useCodeViewItems({
-    allFileDiffs: allFileDiffs ?? EMPTY_FILE_DIFFS,
+    entries,
     lineAnnotationsByFile,
     fileLevelCommentsByFile,
     reviewFiles,
@@ -101,10 +125,6 @@ function DiffViewerInner({
   // count). Annotations live on the item itself, so they don't need a ref.
   const metaRef = useRef({ reviewFiles, fileLevelCommentsByFile });
   metaRef.current = { reviewFiles, fileLevelCommentsByFile };
-
-  // File ids in item order, read by the scroll handler (which runs outside React).
-  const orderedFileIdsRef = useRef<string[]>([]);
-  orderedFileIdsRef.current = (allFileDiffs ?? EMPTY_FILE_DIFFS).map((fd) => fd.name);
 
   // Pending collapse anchor: when a file collapsed from above the viewport, its
   // shrink would shift the visible content up. Captured at toggle time and
@@ -135,7 +155,7 @@ function DiffViewerInner({
   }, []);
 
   const requestLineComment = useCallback(
-    (filePath: string, line: number, side: "addition" | "deletion") => {
+    (filePath: string, line: number, side: "addition" | "deletion" | null) => {
       setActiveInput({ filePath, line, side });
     },
     [],
@@ -186,10 +206,9 @@ function DiffViewerInner({
     instance.setItems(buildAllItems());
   }, [diffKey, filesKey, buildAllItems]);
 
-  // State→viewer bridge (D2): when review state or collapse state changes,
-  // re-emit only the items whose render signature changed via `updateItem`.
-  // Covers comments, viewed, per-file collapse, and collapse-all/expand-all.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles/getIsCollapsed are the change triggers read through refs in collectUpdatedItems
+  // State→viewer bridge (D2): re-emit via `updateItem` only the items whose render
+  // signature changed (comments, viewed, collapse, folder files once fetched).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles/getIsCollapsed/entries are the change triggers read through refs in collectUpdatedItems
   useEffect(() => {
     const ref = codeViewRef.current;
     if (!ref) return;
@@ -204,11 +223,28 @@ function DiffViewerInner({
       pendingAnchorRef.current = null;
       ref.scrollTo({ type: "item", id: anchor.id, align: "start", behavior: "instant" });
     }
-  }, [reviewFiles, getIsCollapsed, collectUpdatedItems]);
+  }, [reviewFiles, getIsCollapsed, entries, collectUpdatedItems]);
+
+  // Folder mode: fetch a file when its section is expanded. `onLoadFile` dedupes,
+  // so this depends on collapse state only, not on each finished load.
+  const folderPaths = folder?.paths;
+  const onLoadFile = folder?.onLoadFile;
+  useEffect(() => {
+    if (!folderPaths || !onLoadFile) return;
+    for (const path of folderPaths) {
+      if (!getIsCollapsed(path)) onLoadFile(path);
+    }
+  }, [folderPaths, onLoadFile, getIsCollapsed]);
 
   // Navigation: scroll to the target file's section and flash it.
   useEffect(() => {
     if (!navigationTargetFile) return;
+    // Folder files start collapsed; picking one in the tree means reading it,
+    // first, and retrying it if its last fetch failed.
+    if (onLoadFile) {
+      onLoadFile(navigationTargetFile, true);
+      if (getIsCollapsed(navigationTargetFile)) toggleFile(navigationTargetFile);
+    }
     codeViewRef.current?.scrollTo({
       type: "item",
       id: navigationTargetFile,
@@ -220,7 +256,7 @@ function DiffViewerInner({
     // held separately: keying it off the navigation target would clear it in the
     // same tick, before the reviewer ever sees it.
     onNavigationHandled(navigationTargetFile);
-  }, [navigationTargetFile, onNavigationHandled]);
+  }, [navigationTargetFile, onNavigationHandled, onLoadFile, getIsCollapsed, toggleFile]);
 
   // Drop the flash rule well after the animation has finished. The fade itself is
   // the CSS animation below, not this timer.
@@ -345,11 +381,10 @@ function DiffViewerInner({
           onClick={() => {
             const hovered = getHoveredLine();
             if (!hovered) return;
-            requestLineComment(
-              item.id,
-              hovered.lineNumber,
-              hovered.side === "deletions" ? "deletion" : "addition",
-            );
+            // Folder items report no side: the comment is on a raw file line.
+            const side =
+              item.type === "file" ? null : hovered.side === "deletions" ? "deletion" : "addition";
+            requestLineComment(item.id, hovered.lineNumber, side);
           }}
           title="Add comment"
           aria-label="Add comment"
@@ -419,12 +454,16 @@ function DiffViewerInner({
     [theme, diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight, handlePostRender],
   );
 
-  if (!patch || !allFileDiffs || allFileDiffs.length === 0) {
+  if (entries.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted">
         <div className="text-center">
-          <p className="text-lg">No changes found</p>
-          <p className="text-sm mt-1">Try a different diff mode</p>
+          <p className="text-lg">{folder ? "No files to review" : "No changes found"}</p>
+          <p className="text-sm mt-1">
+            {folder
+              ? "The folder is empty or only holds binary or oversized files"
+              : "Nothing differs for this launch mode"}
+          </p>
         </div>
       </div>
     );

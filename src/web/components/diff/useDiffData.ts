@@ -3,7 +3,7 @@ import type { DiffLineAnnotation } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
 import { useMemo } from "react";
 import { compareByTreeOrder } from "../../utils/treeOrder";
-import { type CommentAnnotation, getVisibleLines } from "./diffParsing";
+import { type CommentAnnotation, getVisibleLines, splitComments } from "./diffParsing";
 
 export interface DiffData {
   allFileDiffs: ReturnType<typeof parsePatchFiles>[number]["files"] | null;
@@ -33,35 +33,18 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
     return map;
   }, [allFileDiffs]);
 
-  const { lineAnnotationsByFile, fileLevelCommentsByFile } = useMemo(() => {
-    const annotations = new Map<string, DiffLineAnnotation<CommentAnnotation>[]>();
-    const fileLevelMap = new Map<string, ReviewComment[]>();
-    for (const [filePath, fileReview] of Object.entries(reviewFiles)) {
-      const visible = visibleLinesByFile.get(filePath);
-      const fileAnnotations: DiffLineAnnotation<CommentAnnotation>[] = [];
-      const fileComments: ReviewComment[] = [];
-      for (const comment of fileReview.comments) {
-        if (comment.line === null) {
-          fileComments.push(comment);
-        } else {
+  const { lineAnnotationsByFile, fileLevelCommentsByFile } = useMemo(
+    () =>
+      splitComments(
+        reviewFiles,
+        (filePath, comment, line): DiffLineAnnotation<CommentAnnotation> | null => {
           const side = comment.side === "deletion" ? "deletions" : "additions";
-          const lineSet = visible?.[side];
-          if (lineSet?.has(comment.line)) {
-            fileAnnotations.push({
-              side,
-              lineNumber: comment.line,
-              metadata: { comments: [comment] },
-            });
-          } else {
-            fileComments.push(comment);
-          }
-        }
-      }
-      annotations.set(filePath, fileAnnotations);
-      if (fileComments.length > 0) fileLevelMap.set(filePath, fileComments);
-    }
-    return { lineAnnotationsByFile: annotations, fileLevelCommentsByFile: fileLevelMap };
-  }, [reviewFiles, visibleLinesByFile]);
+          if (!visibleLinesByFile.get(filePath)?.[side].has(line)) return null;
+          return { side, lineNumber: line, metadata: { comments: [comment] } };
+        },
+      ),
+    [reviewFiles, visibleLinesByFile],
+  );
 
   return {
     allFileDiffs,

@@ -3,15 +3,21 @@
 import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import type {
-  DiffMode,
   DiffResponse,
   DisplaySettings,
+  LaunchSource,
   ReviewState,
+  SessionResponse,
   SettingsResponse,
 } from "../shared/types";
-import { DISPLAY_SETTINGS_VALIDATORS, isDisplaySettingsKey } from "../shared/types";
+import {
+  DISPLAY_SETTINGS_VALIDATORS,
+  FOLDER_FILE_MAX_MB,
+  isDisplaySettingsKey,
+} from "../shared/types";
 import { patchSettings, readSettings } from "./config";
-import { getBaseBranch, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
+import { listFolder, readFolderFile } from "./folder";
+import { getCheckout, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
 import { deserializeReview } from "./xml-deserializer";
 import { serializeReview } from "./xml-serializer";
 
@@ -20,13 +26,11 @@ interface ServerOptions {
   cwd: string;
   outputFile: string;
   loadExisting: boolean;
-  initialMode: DiffMode;
+  source: LaunchSource;
   extraArgs: string[];
   devMode: boolean;
   themeOverride?: "light" | "dark";
 }
-
-let currentMode: DiffMode = "unstaged";
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -51,25 +55,37 @@ function getWebDistDir(): string {
   return fromDist; // Fallback
 }
 
-async function handleApiRequest(
-  req: Request,
-  pathname: string,
-  opts: ServerOptions,
-): Promise<Response> {
-  // GET /api/diff — return the raw patch + metadata
+async function handleApiRequest(req: Request, url: URL, opts: ServerOptions): Promise<Response> {
+  const pathname = url.pathname;
+
+  // GET /api/session — the launch mode, which decides what the UI fetches next
+  if (pathname === "/api/session" && req.method === "GET") {
+    const body: SessionResponse = { source: opts.source };
+    return jsonResponse(body);
+  }
+
+  // GET /api/diff[?staged=true] — the raw patch + metadata (branch/pending only)
   if (pathname === "/api/diff" && req.method === "GET") {
+    const launch = opts.source;
+    if (launch.type === "folder") {
+      return jsonResponse({ error: "No diff in folder mode" }, 400);
+    }
+    const source =
+      launch.type === "pending"
+        ? { type: "pending" as const, staged: url.searchParams.get("staged") === "true" }
+        : { type: "branch" as const, base: launch.base };
     try {
-      const [patch, branch, baseBranch, repoRoot] = await Promise.all([
-        getGitDiff(currentMode, opts.extraArgs, opts.cwd),
+      const [patch, branch, checkout, repoRoot] = await Promise.all([
+        getGitDiff(source, opts.extraArgs, opts.cwd),
         getCurrentBranch(opts.cwd),
-        getBaseBranch(opts.cwd),
+        getCheckout(opts.cwd),
         getRepoRoot(opts.cwd),
       ]);
 
       const response: DiffResponse = {
         patch,
-        source: { type: "local", mode: currentMode, args: opts.extraArgs },
-        info: { branch, baseBranch, repoRoot },
+        source: { ...source, head: checkout.branch, commit: checkout.commit },
+        info: { branch, repoRoot },
       };
       return jsonResponse(response);
     } catch (err) {
@@ -77,17 +93,40 @@ async function handleApiRequest(
     }
   }
 
-  // POST /api/diff/mode — change the diff mode
-  if (pathname === "/api/diff/mode" && req.method === "POST") {
+  // GET /api/folder/tree — every reviewable file under the folder root
+  if (pathname === "/api/folder/tree" && req.method === "GET") {
+    if (opts.source.type !== "folder") {
+      return jsonResponse({ error: "Not in folder mode" }, 400);
+    }
     try {
-      const body = (await req.json()) as { mode: DiffMode };
-      if (!["unstaged", "staged", "branch"].includes(body.mode)) {
-        return jsonResponse({ error: "Invalid mode" }, 400);
-      }
-      currentMode = body.mode;
-      return jsonResponse({ ok: true, mode: currentMode });
-    } catch {
-      return jsonResponse({ error: "Invalid request body" }, 400);
+      return jsonResponse(await listFolder(opts.source.path));
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : "Unknown error" }, 500);
+    }
+  }
+
+  // GET /api/folder/file?path=<relative> — raw content of one file
+  if (pathname === "/api/folder/file" && req.method === "GET") {
+    if (opts.source.type !== "folder") {
+      return jsonResponse({ error: "Not in folder mode" }, 400);
+    }
+    const result = await readFolderFile(opts.source.path, url.searchParams.get("path") ?? "");
+    if ("content" in result) {
+      return new Response(result.content, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+    switch (result.error) {
+      case "too-large":
+        return jsonResponse(
+          { error: `File exceeds the ${FOLDER_FILE_MAX_MB} MB preview limit` },
+          413,
+        );
+      case "binary":
+        return jsonResponse({ error: "Binary file" }, 415);
+      default:
+        // Traversal answers like a missing file: nothing outside the root exists.
+        return jsonResponse({ error: "File not found" }, 404);
     }
   }
 
@@ -109,6 +148,12 @@ async function handleApiRequest(
   if (pathname === "/api/review" && req.method === "POST") {
     try {
       const state = (await req.json()) as ReviewState;
+      // Record the revision reviewed, so the skill can check the branch before
+      // reopening or applying. Imported sources keep the forge's values.
+      if (state.source.type !== "folder" && !state.source.head) {
+        const { branch, commit } = await getCheckout(opts.cwd);
+        Object.assign(state.source, { head: branch, commit });
+      }
       const xml = serializeReview(state);
       const outputPath = resolve(opts.cwd, opts.outputFile);
       await Bun.write(outputPath, xml);
@@ -174,7 +219,6 @@ function getMimeType(path: string): string {
 }
 
 export function startServer(opts: ServerOptions): number {
-  currentMode = opts.initialMode;
   const webDistDir = getWebDistDir();
 
   const server = Bun.serve({
@@ -187,7 +231,7 @@ export function startServer(opts: ServerOptions): number {
 
       // API routes
       if (pathname.startsWith("/api/")) {
-        return handleApiRequest(req, pathname, opts);
+        return handleApiRequest(req, url, opts);
       }
 
       // In dev mode, proxy to Vite dev server

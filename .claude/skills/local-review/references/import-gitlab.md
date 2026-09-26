@@ -19,6 +19,9 @@ glab api projects/<url-encoded-project>/merge_requests/<mr>/discussions \
 # General notes (not attached to diff positions)
 glab api projects/<url-encoded-project>/merge_requests/<mr>/notes \
   --paginate
+
+# Branches and head commit, recorded on <source>
+glab api projects/<url-encoded-project>/merge_requests/<mr>
 ```
 
 ## Option B — Fetch via REST API (GITLAB_TOKEN fallback)
@@ -27,6 +30,7 @@ Use `fetch` with header `Authorization: Bearer $GITLAB_TOKEN`.
 Paginate using the `X-Next-Page` response header.
 
 ```
+GET https://gitlab.com/api/v4/projects/<url-encoded-project>/merge_requests/<mr>   # source_branch, target_branch, diff_refs.head_sha
 GET https://gitlab.com/api/v4/projects/<url-encoded-project>/merge_requests/<mr>/discussions
 GET https://gitlab.com/api/v4/projects/<url-encoded-project>/merge_requests/<mr>/notes
 ```
@@ -53,7 +57,8 @@ position     — present for diff notes, null for general notes
 - If `position` is present and `position.new_line` is null but `old_line` non-null → side `"deletion"`, line = `old_line`.
 - If `position` is null → general comment (no file/line).
 - Comment id prefix: `gl-<id>`.
-- Source element: `<source type="gitlab-mr" project="<project>" mr="<number>" />`
+- Source element:
+  `<source type="gitlab-mr" project="<project>" mr="<number>" base="<target_branch>" head="<source_branch>" commit="<diff_refs.head_sha>" />`
 - **Comment URL**: construct a permalink for each note:
   - For self-hosted: `https://<host>/<project>/-/merge_requests/<mr>#note_<id>`
   - For gitlab.com: `https://gitlab.com/<project>/-/merge_requests/<mr>#note_<id>`
@@ -81,3 +86,10 @@ resolution algorithm.
 
 Continue with [xml-format.md](xml-format.md) for XML assembly, validation,
 and the write + report steps.
+
+## Check the branch before resolving lines
+
+Line resolution reads local files. If the current branch is not
+`source_branch`, report it and ask as in Steps 3–4 of
+[branch-check.md](branch-check.md) (with `head=<source_branch>`) before resolving
+lines. There is no review file yet, so `local-review check` does not apply here.

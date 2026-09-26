@@ -38,21 +38,29 @@ const CollapseContext = createContext<CollapseContextValue | null>(null);
 interface ProviderProps {
   filePaths: string[];
   reviewFiles: Record<string, FileReviewState>;
+  /** Folder mode: every file starts collapsed, since expanding one is what
+   *  fetches its contents. */
+  collapsedByDefault?: boolean;
   children: ReactNode;
 }
 
-export function CollapseProvider({ filePaths, reviewFiles, children }: ProviderProps) {
+export function CollapseProvider({
+  filePaths,
+  reviewFiles,
+  collapsedByDefault = false,
+  children,
+}: ProviderProps) {
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
 
   const isCollapsedDefault = useCallback(
     (filePath: string): boolean => {
-      if (reviewFiles[filePath]?.viewed) return true;
+      if (collapsedByDefault || reviewFiles[filePath]?.viewed) return true;
       // Files are expanded by default; only viewed and generated files
       // (lockfiles, build output, etc.) collapse automatically. CodeView
       // virtualizes per line, so there's no perf reason to collapse on count.
       return isGeneratedFile(filePath);
     },
-    [reviewFiles],
+    [reviewFiles, collapsedByDefault],
   );
 
   const getIsCollapsed = useCallback(

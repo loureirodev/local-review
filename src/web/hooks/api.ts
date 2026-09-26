@@ -1,34 +1,57 @@
 // Fetch wrapper for the API
 
 import type {
-  DiffMode,
   DiffResponse,
   DisplaySettings,
+  FolderTreeResponse,
   ReviewState,
+  SessionResponse,
   SettingsResponse,
 } from "@shared/types.js";
 
 const BASE = "";
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
+/** A non-2xx response, with its status for callers that branch on it. */
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+async function request(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(`${BASE}${url}`, init);
   if (!res.ok) {
-    const body = await res.json();
-    throw new Error(body.error ?? `Request failed: ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    throw new HttpError(body.error ?? `Request failed: ${res.status}`, res.status);
   }
-  return res.json();
+  return res;
 }
 
-export function fetchDiff(): Promise<DiffResponse> {
-  return api("/api/diff");
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  return (await request(url, init)).json();
 }
 
-export function changeDiffMode(mode: DiffMode): Promise<void> {
-  return api("/api/diff/mode", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode }),
-  });
+export function fetchSession(): Promise<SessionResponse> {
+  return api("/api/session");
+}
+
+/** `staged` only matters in pending mode; branch mode ignores it. */
+export function fetchDiff(staged = false): Promise<DiffResponse> {
+  return api(`/api/diff${staged ? "?staged=true" : ""}`);
+}
+
+export function fetchFolderTree(): Promise<FolderTreeResponse> {
+  return api("/api/folder/tree");
+}
+
+/** Raw text of one folder file. Rejects with an `HttpError` (404/413/415)
+ *  carrying the server's message. */
+export async function fetchFolderFile(path: string): Promise<string> {
+  const res = await request(`/api/folder/file?path=${encodeURIComponent(path)}`);
+  return res.text();
 }
 
 export function fetchReview(): Promise<ReviewState | null> {

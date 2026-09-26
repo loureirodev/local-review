@@ -30,7 +30,9 @@ function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }
       icon = <AgentIcon size={ICON_SIZE_INLINE} />;
       tooltip = "AI agent review";
       break;
-    case "local":
+    case "branch":
+    case "pending":
+    case "folder":
       icon = <UserIcon size={ICON_SIZE_INLINE} />;
       tooltip = "Local comment";
       break;

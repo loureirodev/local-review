@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { nextVersionMap, seedMissingVersions, type VersionMap } from "./useCodeViewItems";
+import {
+  contentSig,
+  fileContents,
+  nextVersionMap,
+  seedMissingVersions,
+  type VersionMap,
+} from "./useCodeViewItems";
 
 /** Signature lookup standing in for `computeSig`. */
 const sigOf = (sigs: Record<string, string>) => (id: string) => sigs[id] ?? "missing";
@@ -104,5 +110,40 @@ describe("nextVersionMap", () => {
     const { emitted } = nextVersionMap(["a", "b"], sigOf({ a: "a1", b: "b1" }), versions);
 
     expect(emitted).toEqual([0, 0]);
+  });
+});
+
+describe("folder file items", () => {
+  test("an unloaded file renders as empty plain text", () => {
+    expect(fileContents("docs/a.md", undefined)).toEqual({
+      name: "docs/a.md",
+      contents: "",
+      lang: "text",
+    });
+  });
+
+  test("a load error renders its message as plain text", () => {
+    expect(fileContents("big.log", { status: "error", message: "Too large" })).toEqual({
+      name: "big.log",
+      contents: "Too large",
+      lang: "text",
+    });
+  });
+
+  test("a loaded file keeps its name for language inference", () => {
+    expect(fileContents("src/a.ts", { status: "loaded", content: "const a = 1;" })).toEqual({
+      name: "src/a.ts",
+      contents: "const a = 1;",
+    });
+  });
+
+  test("the signature changes when the file finishes loading", () => {
+    const pending = contentSig({ type: "file", name: "a.md", file: undefined });
+    const loaded = contentSig({
+      type: "file",
+      name: "a.md",
+      file: { status: "loaded", content: "# a" },
+    });
+    expect(pending).not.toBe(loaded);
   });
 });

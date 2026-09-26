@@ -2,22 +2,37 @@
 
 // ===== Diff Source Types =====
 
-export type DiffMode = "unstaged" | "staged" | "branch";
+/** Git revision a review was made against. Optional: older or hand-written
+ *  reviews lack it, and the skill skips its branch check then. */
+interface GitRef {
+  /** Branch name. */
+  head?: string;
+  /** Full SHA of `HEAD`. */
+  commit?: string;
+}
 
+/** Launch mode (`branch`, `pending`, `folder`) or imported origin of a review.
+ *  `base` on forge sources is the PR/MR target branch. */
 export type DiffSource =
-  | { type: "local"; mode: DiffMode; args?: string[] }
-  | { type: "github-pr"; owner: string; repo: string; pr: number }
-  | { type: "gitlab-mr"; project: string; mr: number }
-  | { type: "agent"; agent?: string };
+  | ({ type: "branch"; base: string } & GitRef)
+  | ({ type: "pending"; staged: boolean } & GitRef)
+  | { type: "folder"; path: string }
+  | ({ type: "github-pr"; owner: string; repo: string; pr: number; base?: string } & GitRef)
+  | ({ type: "gitlab-mr"; project: string; mr: number; base?: string } & GitRef)
+  | ({ type: "agent"; agent?: string } & GitRef);
+
+/** Sources produced by the CLI itself, i.e. the mode fixed at launch. */
+export type LaunchSource = Extract<DiffSource, { type: "branch" | "pending" | "folder" }>;
 
 // ===== Review Types =====
 
 export interface ReviewComment {
   id: string;
   filePath: string;
-  /** Line number in the diff (1-based). null = file-level comment. */
+  /** Line in the view (1-based): diff line in branch/pending modes, file line in
+   *  folder mode. null = file-level comment. */
   line: number | null;
-  /** Which side of the diff this comment is on. */
+  /** Which side of the diff this comment is on. Always null in folder mode. */
   side: "addition" | "deletion" | null;
   body: string;
   createdAt: string;
@@ -43,14 +58,27 @@ export interface ReviewState {
 
 interface RepoInfo {
   branch: string;
-  baseBranch: string;
   repoRoot: string;
 }
 
 export interface DiffResponse {
   patch: string;
-  source: DiffSource;
+  source: Extract<DiffSource, { type: "branch" | "pending" }>;
   info: RepoInfo;
+}
+
+/** The mode the CLI was launched in. Fetched first: it decides which data
+ *  endpoints the UI calls. */
+export interface SessionResponse {
+  source: LaunchSource;
+}
+
+/** Folder mode's per-file cap: larger files are left out of the listing. */
+export const FOLDER_FILE_MAX_MB = 1;
+
+export interface FolderTreeResponse {
+  paths: string[];
+  skipped: { binary: number; oversized: number };
 }
 
 export interface ApiError {

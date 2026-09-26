@@ -13,6 +13,9 @@ Run `which gh` (or `gh --version`):
 Run in sequence, capturing JSON output:
 
 ```bash
+# Branches and head commit, recorded on <source>
+gh pr view <pr> --repo <owner>/<repo> --json headRefName,headRefOid,baseRefName
+
 # Inline review comments (attached to specific files/lines)
 gh api repos/<owner>/<repo>/pulls/<pr>/comments \
   --paginate --jq '.[]'
@@ -29,6 +32,7 @@ Use `fetch` with header `Authorization: Bearer $GITHUB_TOKEN` and
 in the `Link` response header.
 
 ```
+GET https://api.github.com/repos/<owner>/<repo>/pulls/<pr>            # head.ref, head.sha, base.ref
 GET https://api.github.com/repos/<owner>/<repo>/pulls/<pr>/comments
 GET https://api.github.com/repos/<owner>/<repo>/issues/<pr>/comments
 ```
@@ -58,7 +62,10 @@ created_at — ISO datetime
 - Side: `"RIGHT"` → `"addition"`, `"LEFT"` → `"deletion"`.
 - Line: use `line` if non-null, otherwise `original_line`.
 - Comment id prefix: `gh-<id>`.
-- Source element: `<source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>" />`
+- Source element:
+  `<source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>" base="<baseRefName>" head="<headRefName>" commit="<headRefOid>" />`
+  (REST: `base.ref`, `head.ref`, `head.sha`). These let `open` launch on the
+  PR's diff and let `open`/`apply` check the branch.
 - **Comment URL**: construct a permalink for each comment:
   - Review comment (inline): `https://github.com/<owner>/<repo>/pull/<pr>#discussion_r<id>`
   - General comment (issue-style): `https://github.com/<owner>/<repo>/pull/<pr>#issuecomment-<id>`
@@ -77,6 +84,13 @@ Before mapping, filter out noise that would clutter the review:
 - **Author replies**: short replies like "fixed", "done", "will do", "addressed"
   from the PR author are acknowledgments, not actionable review comments. Skip
   them unless they contain code suggestions or substantive discussion.
+
+## Check the branch before resolving lines
+
+Line resolution reads local files. If the current branch
+(`git rev-parse --abbrev-ref HEAD`) is not `headRefName`, report it and ask as in Steps 3–4 of
+[branch-check.md](branch-check.md) (with `head=<headRefName>`) before resolving
+lines. There is no review file yet, so `local-review check` does not apply here.
 
 ## Line resolution for general comments
 

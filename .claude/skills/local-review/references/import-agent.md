@@ -66,13 +66,18 @@ Use prefix `agent-<N>` where N is a 1-based sequential index:
 
 ## Step 5 — Assemble XML
 
-Source element:
+Source element, recording the checkout the agent reviewed
+(`git rev-parse --abbrev-ref HEAD`, `git rev-parse HEAD`; omit `head` when
+detached):
 
 ```xml
-<source type="agent" />
+<source type="agent" head="<branch>" commit="<sha>" />
 <!-- or, if the agent name is known: -->
-<source type="agent" agent="claude" />
+<source type="agent" agent="claude" head="<branch>" commit="<sha>" />
 ```
+
+Agent imports target git changes. Folder reviews (`--folder`) are made in the
+UI and cannot be imported into; if the user asks for that, say so and stop.
 
 Continue with [xml-format.md](xml-format.md) for XML assembly, validation,
 and the write + report steps. Use `type="agent"` in the source element and
@@ -92,5 +97,5 @@ Import complete — review.xml written to <output-path>
   Unresolved:     <N>  (stored under _discussion)
 
 To view in local-review:
-  local-review --output-file <output-path> --existing
+  local-review --output-file <output-path> --existing [--branch]
 ```

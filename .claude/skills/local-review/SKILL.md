@@ -14,7 +14,9 @@ description: >
   GitHub PR URL, GitLab MR URL, or a file path to review text.
 
   open — launch the local-review UI in the browser. Starts clean by default;
-  add --existing to load a previously saved review.xml. Trigger: "open the
+  add --existing to load a previously saved review.xml (the CLI checks the
+  branch first and picks the mode from the review). Modes: pending changes (default), --branch [base], --folder <path>
+  to review a folder's files. Trigger: "open the
   review", "open the UI", "open local-review", "show me the review", "now open
   it", "show it in the UI".
 ---
@@ -25,7 +27,7 @@ description: >
 |--------|---------|-----------|
 | `apply` | Read review.xml and implement code changes *(primary)* | `--input`, `--file`, `--id` |
 | `import <URL\|file>` | Import review comments from GitHub PR, GitLab MR, or agent review → write review.xml | `--last-comment`, `--output` |
-| `open` | Launch the local-review web UI in the browser | `--existing`, `--port`, `--input` |
+| `open` | Launch the local-review web UI in the browser | `--existing`, `--branch [base]`, `--folder <path>`, `--no-check`, `--port`, `--input` |
 
 When invoked with `help` or no action, describe these actions and their flags.
 
@@ -43,6 +45,9 @@ The apply workflow bridges the local-review UI and the codebase:
 [references/apply.md](references/apply.md).
 
 **Schema reference**: [assets/review.xsd](assets/review.xsd)
+
+**Before editing**: run `local-review check --json` and act on it —
+[references/branch-check.md](references/branch-check.md).
 
 **IMPORTANT**: Never run `git add` or `git commit`. Only modify working tree files.
 
@@ -76,6 +81,11 @@ UI. Read source files and search for referenced code to determine exact lines.
 
 ## Action: open
 
-Launches the local-review web UI so the user can review a diff interactively.
+Launches the local-review web UI so the user can review interactively. The
+mode is fixed at launch: pending changes (no flag), `--branch [base]`, or
+`--folder <path>` (a folder's files, no diff). With `--existing` the CLI derives the
+mode from the review's `<source>` and checks the branch **before** the server
+starts; run `local-review check --json` first so you can ask the user
+([references/branch-check.md](references/branch-check.md)).
 
 **Full workflow**: read [references/open.md](references/open.md).

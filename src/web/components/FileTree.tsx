@@ -1,6 +1,10 @@
 import type { GitStatusEntry } from "@pierre/trees";
 import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react";
-import type { FileReviewState } from "@shared/types.js";
+import {
+  type FileReviewState,
+  FOLDER_FILE_MAX_MB,
+  type FolderTreeResponse,
+} from "@shared/types.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useCollapse } from "../context/CollapseContext";
 import { LinkButton } from "./Button";
@@ -10,14 +14,17 @@ interface FileTreeProps {
   reviewFiles: Record<string, FileReviewState>;
   selectedFile: string | null;
   onSelectFile: (filePath: string) => void;
+  /** Folder mode: files left out of the listing, reported in the footer. */
+  skipped?: FolderTreeResponse["skipped"];
 }
 
 export interface FileInfo {
   name: string;
-  type: "new" | "deleted" | "renamed" | "renamed-changed" | "change";
+  /** Git change type. Absent in folder mode, where files carry no status. */
+  type?: "new" | "deleted" | "renamed" | "renamed-changed" | "change";
 }
 
-const FILE_TYPE_TO_GIT_STATUS: Record<FileInfo["type"], GitStatusEntry["status"]> = {
+const FILE_TYPE_TO_GIT_STATUS: Record<NonNullable<FileInfo["type"]>, GitStatusEntry["status"]> = {
   new: "untracked",
   deleted: "deleted",
   renamed: "renamed",
@@ -91,14 +98,19 @@ const UNSAFE_CSS = `
   }
 `;
 
-function CollapseFooter() {
+function CollapseFooter({ skipped }: { skipped?: FileTreeProps["skipped"] }) {
   const { totalFiles, collapsedCount, setAllCollapsed } = useCollapse();
-  if (totalFiles === 0) return null;
+  const skippedCount = (skipped?.binary ?? 0) + (skipped?.oversized ?? 0);
+  if (totalFiles === 0 && skippedCount === 0) return null;
+  const skippedTitle = skipped
+    ? `Not listed: ${skipped.binary} binary, ${skipped.oversized} over ${FOLDER_FILE_MAX_MB} MB`
+    : undefined;
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 border-t border-hair bg-panel text-[11px] text-muted">
-      <span className="flex-1 truncate">
+      <span className="flex-1 truncate" title={skippedTitle}>
         {totalFiles} file{totalFiles !== 1 ? "s" : ""}
         {collapsedCount > 0 && ` · ${collapsedCount} collapsed`}
+        {skippedCount > 0 && ` · ${skippedCount} skipped`}
       </span>
       <LinkButton onClick={() => setAllCollapsed(true)} title="Collapse all files">
         Collapse all
@@ -116,6 +128,7 @@ export default function FileTree({
   reviewFiles,
   selectedFile,
   onSelectFile,
+  skipped,
 }: FileTreeProps) {
   const reviewFilesRef = useRef(reviewFiles);
   reviewFilesRef.current = reviewFiles;
@@ -140,7 +153,10 @@ export default function FileTree({
 
   // Sync git status. Derives only from the file list.
   const gitEntries = useMemo<GitStatusEntry[]>(
-    () => files.map((f) => ({ path: f.name, status: FILE_TYPE_TO_GIT_STATUS[f.type] })),
+    () =>
+      files.flatMap((f) =>
+        f.type ? [{ path: f.name, status: FILE_TYPE_TO_GIT_STATUS[f.type] }] : [],
+      ),
     [files],
   );
   useEffect(() => {
@@ -249,7 +265,7 @@ export default function FileTree({
       {/* Tree */}
       <PierreFileTree model={model} style={TREE_STYLE_BASE} />
 
-      <CollapseFooter />
+      <CollapseFooter skipped={skipped} />
     </div>
   );
 }

@@ -22,8 +22,12 @@ export function CommentInputOverlay({ activeInput, onSubmit, onCancel }: Comment
           <>
             <span className="text-faint">:</span>
             <span className="text-muted">L{activeInput.line}</span>
-            <span className="text-faint">&middot;</span>
-            <span className="text-faint">{activeInput.side}</span>
+            {activeInput.side ? (
+              <>
+                <span className="text-faint">&middot;</span>
+                <span className="text-faint">{activeInput.side}</span>
+              </>
+            ) : null}
           </>
         ) : (
           <>
