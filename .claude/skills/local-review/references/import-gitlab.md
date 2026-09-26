@@ -78,6 +78,13 @@ Before mapping, filter out noise that would clutter the review:
   from the MR author are acknowledgments, not actionable review comments. Skip
   them unless they contain code suggestions or substantive discussion.
 
+## Check the branch before resolving lines
+
+Line resolution reads local files. If the current branch is not
+`source_branch`, report it and ask as in Steps 3–4 of
+[branch-check.md](branch-check.md) (with `head=<source_branch>`) before resolving
+lines. There is no review file yet, so `local-review check` does not apply here.
+
 ## Line resolution for general comments
 
 General comments (no file/line) should be resolved to specific files and lines
@@ -86,10 +93,3 @@ resolution algorithm.
 
 Continue with [xml-format.md](xml-format.md) for XML assembly, validation,
 and the write + report steps.
-
-## Check the branch before resolving lines
-
-Line resolution reads local files. If the current branch is not
-`source_branch`, report it and ask as in Steps 3–4 of
-[branch-check.md](branch-check.md) (with `head=<source_branch>`) before resolving
-lines. There is no review file yet, so `local-review check` does not apply here.

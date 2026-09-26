@@ -238,10 +238,15 @@ function AppContent() {
     try {
       const reviewState: ReviewState = {
         timestamp: new Date().toISOString(),
-        // A saved review keeps its source (an import's forge and revision); a
-        // new one is the view shown. The server adds `head`/`commit` if absent.
+        // A saved review keeps its source and revision, with pending reviews
+        // following the staged toggle. New reviews use the view shown.
+        // The server adds `head`/`commit` if absent.
         source:
-          session.reviewLoaded && state.source ? state.source : viewSource(session.launch, staged),
+          session.reviewLoaded && state.source
+            ? state.source.type === "pending" && session.launch.type === "pending"
+              ? { ...state.source, staged }
+              : state.source
+            : viewSource(session.launch, staged),
         files: Object.values(state.files),
       };
       const result = await submitReview(reviewState);
