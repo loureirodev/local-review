@@ -1,23 +1,32 @@
 import type { ReviewComment } from "@shared/types.js";
-import { useCallback, useState } from "react";
-import { Button } from "./Button";
+import { type ReactNode, useCallback, useState } from "react";
+import { CommentCard, CommentFormFooter } from "./CommentCard";
+import { MarkdownEditor } from "./markdown/MarkdownEditor";
+
+/** Lines the empty editor reserves for a new comment. */
+const NEW_COMMENT_LINES = 4;
 
 interface CommentInputProps {
   filePath: string;
   line: number | null;
   side: "addition" | "deletion" | null;
+  /** What the comment is attached to, on the left of the header row. */
+  label: ReactNode;
   onSubmit: (comment: ReviewComment) => void;
   onCancel: () => void;
 }
 
+/** A new comment, with the formatting toolbar in its header. */
 export default function CommentInput({
   filePath,
   line,
   side,
+  label,
   onSubmit,
   onCancel,
 }: CommentInputProps) {
   const [body, setBody] = useState("");
+  const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
 
   const handleSubmit = useCallback(() => {
     if (!body.trim()) return;
@@ -30,45 +39,35 @@ export default function CommentInput({
       createdAt: new Date().toISOString(),
     };
     onSubmit(comment);
-    setBody("");
   }, [body, filePath, line, side, onSubmit]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleSubmit();
-      }
-      if (e.key === "Escape") {
-        onCancel();
-      }
-    },
-    [handleSubmit, onCancel],
-  );
-
   return (
-    <div className="p-2 bg-panel border border-hair rounded-b-md">
-      <textarea
+    <CommentCard
+      writing
+      header={
+        <>
+          <span className="flex items-center gap-1.5 min-w-0 text-[11px] text-muted">{label}</span>
+          <div ref={setToolbar} className="ml-auto flex items-center gap-0.5 min-h-6" />
+        </>
+      }
+      footer={
+        <CommentFormFooter
+          submitLabel="Comment"
+          canSubmit={body.trim().length > 0}
+          onSubmit={handleSubmit}
+          onCancel={onCancel}
+        />
+      }
+    >
+      <MarkdownEditor
         value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Write a comment..."
-        rows={3}
-        className="w-full px-2.5 py-2 text-[13px] bg-bg border border-hair rounded-md resize-none focus:outline-none focus:border-accent text-text placeholder-faint transition-colors leading-relaxed"
+        onChange={setBody}
+        onSubmit={handleSubmit}
+        onCancel={onCancel}
+        toolbarContainer={toolbar}
+        minLines={NEW_COMMENT_LINES}
+        autoFocus
       />
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-[11px] text-faint">
-          <kbd className="px-1 py-px bg-track rounded text-[10px]">Ctrl</kbd>
-          {" + "}
-          <kbd className="px-1 py-px bg-track rounded text-[10px]">Enter</kbd>
-        </span>
-        <div className="flex gap-1.5">
-          <Button onClick={onCancel}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={!body.trim()}>
-            Comment
-          </Button>
-        </div>
-      </div>
-    </div>
+    </CommentCard>
   );
 }

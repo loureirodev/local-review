@@ -96,22 +96,23 @@ export default function FileCommentsDrawer({
 
               {/* Add comment area */}
               <div className="border-t border-hair bg-bg">
-                {inputVisible ? (
-                  <CommentInput
-                    filePath={filePath}
-                    line={null}
-                    side={null}
-                    onSubmit={handleAddComment}
-                    onCancel={() => setInputVisible(false)}
-                  />
-                ) : (
-                  <div className="p-2">
+                <div className="p-2">
+                  {inputVisible ? (
+                    <CommentInput
+                      filePath={filePath}
+                      line={null}
+                      side={null}
+                      label="File comment"
+                      onSubmit={handleAddComment}
+                      onCancel={() => setInputVisible(false)}
+                    />
+                  ) : (
                     <Button onClick={() => setInputVisible(true)}>
                       <PlusIcon size={ICON_SIZE_INLINE} />
                       Add file comment
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </>
           )}

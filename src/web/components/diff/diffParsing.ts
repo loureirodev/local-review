@@ -3,6 +3,7 @@ import type { FileReviewState, ReviewComment } from "@shared/types.js";
 
 export interface CommentAnnotation {
   comments: ReviewComment[];
+  preview?: string;
 }
 
 /** Diff items annotate a side; folder file items only a line. */

@@ -22,6 +22,7 @@ interface UseCodeViewItemsParams {
   fileLevelCommentsByFile: Map<string, ReviewComment[]>;
   reviewFiles: Record<string, FileReviewState>;
   getIsCollapsed: (filePath: string) => boolean;
+  getPreview: (filePath: string) => string | null;
 }
 
 export interface CodeViewItemsResult {
@@ -146,6 +147,7 @@ export function useCodeViewItems({
   fileLevelCommentsByFile,
   reviewFiles,
   getIsCollapsed,
+  getPreview,
 }: UseCodeViewItemsParams): CodeViewItemsResult {
   const entryById = useMemo(() => {
     const map = new Map<string, ViewerEntry>();
@@ -164,6 +166,7 @@ export function useCodeViewItems({
     fileLevelCommentsByFile,
     reviewFiles,
     getIsCollapsed,
+    getPreview,
   });
   latest.current = {
     entryById,
@@ -171,6 +174,7 @@ export function useCodeViewItems({
     fileLevelCommentsByFile,
     reviewFiles,
     getIsCollapsed,
+    getPreview,
   };
 
   const versionRef = useRef<VersionMap>(new Map());
@@ -182,9 +186,11 @@ export function useCodeViewItems({
       fileLevelCommentsByFile: fileMap,
       reviewFiles: review,
       getIsCollapsed: isCollapsed,
+      getPreview: previewOf,
     } = latest.current;
     const entry = byId.get(id);
     const collapsed = isCollapsed(id) ? 1 : 0;
+    const preview = previewOf(id) === null ? 0 : 1;
     const viewed = review[id]?.viewed ? 1 : 0;
 
     const parts: string[] = [];
@@ -199,18 +205,43 @@ export function useCodeViewItems({
       for (const comment of fileComments) parts.push(commentSig(comment));
     }
 
-    return `${collapsed}|${viewed}|${contentSig(entry)}|${parts.join(",")}`;
+    return `${collapsed}|${viewed}|${preview}|${contentSig(entry)}|${parts.join(",")}`;
   }, []);
 
   const buildItem = useCallback((id: string, version: number): DiffCodeViewItem | undefined => {
     const {
       entryById: byId,
       lineAnnotationsByFile: lineMap,
+      reviewFiles: review,
       getIsCollapsed: isCollapsed,
+      getPreview: previewOf,
     } = latest.current;
     const entry = byId.get(id);
     if (!entry) return undefined;
     const annotations = lineMap.get(id) ?? EMPTY_ANNOTATIONS;
+    const preview = previewOf(id);
+    if (preview !== null) {
+      // CodeView only renders code, so the preview travels as the file-level
+      // annotation (line 0) of an otherwise empty file item.
+      return {
+        id,
+        type: "file",
+        file: { name: id, contents: "", lang: "text" },
+        annotations: [
+          {
+            lineNumber: 0,
+            metadata: {
+              // Every line comment, including those the source view can't
+              // anchor (past the end of the file): the preview places each by line.
+              comments: (review[id]?.comments ?? []).filter((comment) => comment.line !== null),
+              preview,
+            },
+          },
+        ],
+        collapsed: isCollapsed(id),
+        version,
+      };
+    }
     if (entry.type === "diff") {
       return {
         id,

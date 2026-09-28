@@ -112,6 +112,8 @@ function AppContent() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // A focused control that handled the key (the comment editor's bold) wins.
+      if (e.defaultPrevented) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "b") {
         e.preventDefault();
         setSidebarCollapsed((c) => !c);
