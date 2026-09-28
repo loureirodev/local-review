@@ -280,3 +280,285 @@ body {
     transform: translateY(-8px);
   }
 }
+
+/* Rendered markdown: comment bodies (compact) and the folder preview (normal).
+   Scoped to stop at `.md-block-comments`, so preview styles never reach a comment card. */
+@scope (.md-body) to (.md-block-comments) {
+  /* Spacing comes from the density scopes below, as variables, so each rule
+     is written once and the preview's add buttons can line up with it. */
+  :scope {
+    --md-heading-lh: 1.3;
+    color: var(--color-text);
+    line-height: 1.6;
+    overflow-wrap: break-word;
+  }
+
+  p,
+  ul,
+  ol,
+  pre,
+  .md-code-block,
+  blockquote,
+  table {
+    margin: var(--md-gap) 0;
+  }
+
+  /* Blocks in the preview sit inside an .md-block wrapper, so the edge
+     margins to drop are one level down there. */
+  :scope > :first-child,
+  :scope > .md-block:first-child > :nth-child(2) {
+    margin-top: 0;
+  }
+  :scope > :last-child,
+  :scope > .md-block:last-child > :nth-child(2) {
+    margin-bottom: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    line-height: var(--md-heading-lh);
+  }
+
+  code {
+    padding: 0.1em 0.3em;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--color-track);
+    border-radius: var(--radius-sm);
+  }
+
+  pre,
+  .md-code-block {
+    display: block;
+    overflow-x: auto;
+    background: var(--color-panel);
+    padding: var(--md-pre-pad-y) var(--md-pre-pad-x);
+    border: 1px solid var(--color-hair);
+    border-radius: var(--radius-sm);
+  }
+  pre code {
+    padding: 0;
+    background: transparent;
+  }
+  /* The editor's code block is a bare <code>, not <pre><code>. */
+  .md-code-block {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  a {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+
+  del,
+  .md-strike {
+    text-decoration: line-through;
+  }
+
+  ul {
+    list-style: disc;
+  }
+  ol {
+    list-style: decimal;
+  }
+  ul,
+  ol {
+    padding-left: var(--md-indent);
+  }
+  /* A nested list sits tight against its item. */
+  li > ul,
+  li > ol {
+    margin: 0;
+  }
+  /* The editor nests a list inside an item of its own, which has no marker. */
+  .md-li-nested {
+    list-style: none;
+  }
+  input[type="checkbox"] {
+    margin-right: 0.4em;
+    vertical-align: middle;
+  }
+
+  blockquote {
+    padding-left: var(--md-quote-indent);
+    color: var(--color-muted);
+    border-left: 2px solid var(--color-track);
+  }
+
+  table {
+    border-collapse: collapse;
+    display: block;
+    overflow-x: auto;
+  }
+  th,
+  td {
+    padding: var(--md-cell-pad-y) var(--md-cell-pad-x);
+    border: 1px solid var(--color-hair);
+    text-align: left;
+  }
+  th {
+    font-weight: 600;
+    background: var(--color-panel);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--color-hair);
+  }
+
+  img {
+    max-width: 100%;
+  }
+}
+
+@scope (.md-body--compact) to (.md-block-comments) {
+  :scope {
+    --md-gap: 0.35rem;
+    --md-indent: 1.1rem;
+    --md-pre-pad-y: 0.4rem;
+    --md-pre-pad-x: 0.5rem;
+    --md-quote-indent: 0.6rem;
+    --md-cell-pad-y: 0.2rem;
+    --md-cell-pad-x: 0.5rem;
+    font-size: 13px;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 0.5rem 0 0.25rem;
+    font-size: 13px;
+  }
+}
+
+@scope (.md-body--normal) to (.md-block-comments) {
+  :scope {
+    --md-gap: 0.75rem;
+    --md-indent: 1.5rem;
+    --md-pre-pad-y: 0.75rem;
+    --md-pre-pad-x: 1rem;
+    --md-pre-size: 13px;
+    --md-quote-indent: 0.9rem;
+    --md-cell-pad-y: 0.35rem;
+    --md-cell-pad-x: 0.75rem;
+    --md-h1-size: 1.6em;
+    --md-h2-size: 1.3em;
+    --md-h3-size: 1.1em;
+    font-size: 14px;
+  }
+  h1 {
+    font-size: var(--md-h1-size);
+    margin: 1.5rem 0 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--color-hair);
+  }
+  h2 {
+    font-size: var(--md-h2-size);
+    margin: 1.25rem 0 0.6rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--color-hair);
+  }
+  h3 {
+    font-size: var(--md-h3-size);
+    margin: 1rem 0 0.5rem;
+  }
+  h4,
+  h5,
+  h6 {
+    font-size: 1em;
+    margin: 1rem 0 0.5rem;
+  }
+  li {
+    margin: 0.2rem 0;
+  }
+  pre {
+    font-size: var(--md-pre-size);
+  }
+  hr {
+    margin: 1.25rem 0;
+  }
+}
+
+/* The folder file preview: a reading column on the diff ground. Its left
+   margin is a gutter holding each block's add-comment button. */
+.md-preview {
+  position: relative;
+  padding: 1rem 2rem 1.5rem 3rem;
+  max-width: 56rem;
+  font-family: var(--font-body);
+}
+
+/* Positioned against .md-preview, not the block, so every button lines up in
+   the one margin column however deeply its block is nested. `top` is left
+   auto: the button keeps its static position, the block's first line, and
+   takes that line's height (`1lh`) to centre on it.
+
+   It spans the whole margin, up to the column's text, and takes the pointer
+   even while hidden: moving from a block to its button never leaves the
+   block's descendants, so the button stays shown on the way. A nested list
+   item's text sits past the margin, behind its list's indent; the delay on
+   hiding carries the button across that gap. */
+.md-block-add {
+  position: absolute;
+  left: 0;
+  width: 3rem;
+  padding-left: 0.75rem;
+  display: flex;
+  align-items: center;
+  height: 1lh;
+  opacity: 0;
+  transition: opacity 150ms ease-out 150ms;
+}
+
+/* Match the first line of blocks whose text isn't set at the body size,
+   reading the same variables the blocks are styled with (+1px: the border). */
+.md-block:has(> :is(h1, h2, h3, h4, h5, h6)) > .md-block-add {
+  line-height: var(--md-heading-lh);
+}
+.md-block:has(> h1) > .md-block-add {
+  font-size: var(--md-h1-size);
+}
+.md-block:has(> h2) > .md-block-add {
+  font-size: var(--md-h2-size);
+}
+.md-block:has(> h3) > .md-block-add {
+  font-size: var(--md-h3-size);
+}
+.md-block:has(> pre) > .md-block-add {
+  margin-top: calc(var(--md-pre-pad-y) + 1px);
+  font-size: var(--md-pre-size);
+}
+.md-block:has(> table) > .md-block-add {
+  margin-top: calc(var(--md-cell-pad-y) + 1px);
+}
+
+/* Only the innermost hovered block offers its button, so a paragraph inside a
+   list item doesn't show two, and a comment card under a block doesn't. */
+.md-block:hover:not(:has(.md-block:hover, .md-block-comments:hover)) > .md-block-add,
+.md-block-add:focus-within {
+  opacity: 1;
+  transition-delay: 0s;
+}
+
+/* Comment cards under a block, as under a line in the code view. The
+   negative inline margin cancels the card's own, so it spans the column. */
+.md-block-comments {
+  margin: 0.5rem -0.25rem 0.75rem;
+  font-size: 13px;
+  line-height: 1.5;
+}

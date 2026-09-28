@@ -6,23 +6,30 @@ import type {
 } from "@pierre/diffs/react";
 import { CodeView, WorkerPoolContextProvider } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types.js";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCollapse } from "../context/CollapseContext";
 import { useReview } from "../context/ReviewContext";
 import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
-import { IconButton } from "./Button";
 import CommentDisplay from "./CommentDisplay";
 import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay";
 import { HIGHLIGHTER_OPTIONS, THEME, WORKER_POOL_OPTIONS } from "./diff/constants";
 import type { CommentAnnotation, FolderFileState, ViewerEntry } from "./diff/diffParsing";
 import { EMPTY_COMMENTS } from "./diff/diffParsing";
-import { FileCommentBadge, HeaderChevron, ViewedToggle } from "./diff/HeaderControls";
+import {
+  AddCommentButton,
+  FileCommentBadge,
+  HeaderChevron,
+  MarkdownViewToggle,
+  ViewedToggle,
+} from "./diff/HeaderControls";
 import { type DiffCodeViewItem, useCodeViewItems } from "./diff/useCodeViewItems";
 import { useDiffData } from "./diff/useDiffData";
 import { useFolderData } from "./diff/useFolderData";
 import FileCommentsDrawer from "./FileCommentsDrawer";
-import { ICON_SIZE_INLINE, PlusIcon } from "./icons";
+import { useMarkdownPreview } from "./markdown/useMarkdownPreview";
+
+const MarkdownPreview = lazy(() => import("./markdown/MarkdownPreview"));
 
 /** What the viewer shows: a git patch, or the files of a folder (folder mode),
  *  whose contents are requested through `onLoadFile` as files expand. */
@@ -71,6 +78,11 @@ const NAVIGATION_FLASH_CLEANUP_MS = 5000;
 // items or the diff-mode shape (`{ lineNumber, side }`) for diff items.
 type GutterHoverGetter = () => { lineNumber: number; side?: "additions" | "deletions" } | undefined;
 
+/** An item standing in for a markdown file shown as its rendered preview. */
+function isPreviewItem(item: DiffCodeViewItem): boolean {
+  return item.annotations?.[0]?.metadata?.preview != null;
+}
+
 function DiffViewerInner({
   content,
   diffKey,
@@ -110,6 +122,9 @@ function DiffViewerInner({
     ? folderData
     : { ...diffData, entries: diffEntries };
 
+  // Folder markdown files shown rendered (diffs always show code).
+  const { previewable, sourceFiles, setPreview, getPreview } = useMarkdownPreview(entries);
+
   const codeViewRef = useRef<CodeViewHandle<CommentAnnotation>>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
 
@@ -119,12 +134,12 @@ function DiffViewerInner({
     fileLevelCommentsByFile,
     reviewFiles,
     getIsCollapsed,
+    getPreview,
   });
 
-  // Live data read by the header-metadata callback (viewed + file-level comment
-  // count). Annotations live on the item itself, so they don't need a ref.
-  const metaRef = useRef({ reviewFiles, fileLevelCommentsByFile });
-  metaRef.current = { reviewFiles, fileLevelCommentsByFile };
+  // Live data for the header-metadata callback; annotations live on the item itself.
+  const metaRef = useRef({ reviewFiles, fileLevelCommentsByFile, previewable, sourceFiles });
+  metaRef.current = { reviewFiles, fileLevelCommentsByFile, previewable, sourceFiles };
 
   // Pending collapse anchor: when a file collapsed from above the viewport, its
   // shrink would shift the visible content up. Captured at toggle time and
@@ -208,7 +223,7 @@ function DiffViewerInner({
 
   // State→viewer bridge (D2): re-emit via `updateItem` only the items whose render
   // signature changed (comments, viewed, collapse, folder files once fetched).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles/getIsCollapsed/entries are the change triggers read through refs in collectUpdatedItems
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles/getIsCollapsed/getPreview/entries are the change triggers read through refs in collectUpdatedItems
   useEffect(() => {
     const ref = codeViewRef.current;
     if (!ref) return;
@@ -223,7 +238,7 @@ function DiffViewerInner({
       pendingAnchorRef.current = null;
       ref.scrollTo({ type: "item", id: anchor.id, align: "start", behavior: "instant" });
     }
-  }, [reviewFiles, getIsCollapsed, entries, collectUpdatedItems]);
+  }, [reviewFiles, getIsCollapsed, getPreview, entries, collectUpdatedItems]);
 
   // Folder mode: fetch a file when its section is expanded. `onLoadFile` dedupes,
   // so this depends on collapse state only, not on each finished load.
@@ -309,10 +324,16 @@ function DiffViewerInner({
       node: HTMLElement,
       _instance: unknown,
       phase: PostRenderPhase,
-      context: { item: { id: string } },
+      context: { item: DiffCodeViewItem },
     ) => {
-      if (phase === "unmount") node.removeAttribute("data-file-id");
-      else node.setAttribute("data-file-id", context.item.id);
+      if (phase === "unmount") {
+        node.removeAttribute("data-file-id");
+        node.removeAttribute("data-md-preview");
+        return;
+      }
+      node.setAttribute("data-file-id", context.item.id);
+      // Lets the shadow CSS hide the preview item's placeholder line.
+      node.toggleAttribute("data-md-preview", isPreviewItem(context.item));
     },
     [],
   );
@@ -320,9 +341,27 @@ function DiffViewerInner({
   const renderAnnotation = useCallback(
     (
       annotation: LineAnnotation<CommentAnnotation> | DiffLineAnnotation<CommentAnnotation>,
-      _item: DiffCodeViewItem,
+      item: DiffCodeViewItem,
     ) => {
       if (!annotation.metadata) return null;
+      const { preview, comments } = annotation.metadata;
+      if (preview != null) {
+        return (
+          <Suspense
+            fallback={<div className="px-4 py-6 text-[13px] text-muted">Loading preview…</div>}
+          >
+            <MarkdownPreview
+              filePath={item.id}
+              content={preview}
+              comments={comments}
+              source={source}
+              onRequestComment={requestLineComment}
+              onDeleteComment={onDeleteComment}
+              onUpdateComment={onUpdateComment}
+            />
+          </Suspense>
+        );
+      }
       return (
         <div className="border-t border-hair">
           {annotation.metadata.comments.map((comment) => (
@@ -337,7 +376,7 @@ function DiffViewerInner({
         </div>
       );
     },
-    [source, onDeleteComment, onUpdateComment],
+    [source, onDeleteComment, onUpdateComment, requestLineComment],
   );
 
   const renderHeaderPrefix = useCallback(
@@ -353,11 +392,22 @@ function DiffViewerInner({
   const renderHeaderMetadata = useCallback(
     (item: DiffCodeViewItem) => {
       const filePath = item.id;
-      const { reviewFiles: review, fileLevelCommentsByFile: fileMap } = metaRef.current;
+      const {
+        reviewFiles: review,
+        fileLevelCommentsByFile: fileMap,
+        previewable: previewableFiles,
+        sourceFiles: shownAsSource,
+      } = metaRef.current;
       const commentCount = fileMap.get(filePath)?.length ?? 0;
       const viewed = review[filePath]?.viewed ?? false;
       return (
         <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          {previewableFiles.has(filePath) ? (
+            <MarkdownViewToggle
+              preview={!shownAsSource.has(filePath)}
+              onChange={(preview) => setPreview(filePath, preview)}
+            />
+          ) : null}
           <FileCommentBadge
             count={commentCount}
             onClick={() => openDrawer(filePath, commentCount === 0)}
@@ -366,18 +416,18 @@ function DiffViewerInner({
         </span>
       );
     },
-    [openDrawer, toggleViewed],
+    [openDrawer, toggleViewed, setPreview],
   );
 
   const renderGutterUtility = useCallback(
-    (getHoveredLine: GutterHoverGetter, item: DiffCodeViewItem) => (
-      // Slotted into CodeView's gutter, so document styles reach it. The
-      // wrapper positions it over the line and carries the shadow (a documented
-      // exception in DESIGN.md), leaving the button itself unstyled.
-      <div className="absolute -left-2 top-1/2 -translate-y-1/2 z-10 rounded-md shadow-float">
-        <IconButton
-          compact
-          filled
+    (getHoveredLine: GutterHoverGetter, item: DiffCodeViewItem) =>
+      // The preview's placeholder line isn't a file line; its blocks carry
+      // their own add-comment buttons.
+      isPreviewItem(item) ? null : (
+        // Slotted into CodeView's gutter, so document styles reach it.
+        <AddCommentButton
+          className="absolute -left-2 top-1/2 -translate-y-1/2 z-10"
+          label="Add comment"
           onClick={() => {
             const hovered = getHoveredLine();
             if (!hovered) return;
@@ -386,13 +436,8 @@ function DiffViewerInner({
               item.type === "file" ? null : hovered.side === "deletions" ? "deletion" : "addition";
             requestLineComment(item.id, hovered.lineNumber, side);
           }}
-          title="Add comment"
-          aria-label="Add comment"
-        >
-          <PlusIcon size={ICON_SIZE_INLINE} />
-        </IconButton>
-      </div>
-    ),
+        />
+      ),
     [requestLineComment],
   );
 
@@ -448,6 +493,22 @@ function DiffViewerInner({
            not (only when content actually overflows). */
         [data-code] {
           overflow-x: ${wrapLines ? "hidden" : "auto"} !important;
+        }
+
+        /* A markdown preview item is an empty file whose file-level annotation
+           carries the rendered preview: show only that, full width. */
+        :host([data-md-preview]) [data-gutter],
+        :host([data-md-preview]) [data-content] > [data-line] {
+          display: none;
+        }
+        /* Its track would otherwise size to the content, which for an empty
+           file is just the preview's own width: take the section's instead. */
+        :host([data-md-preview]) [data-content] {
+          grid-column: 1 / -1;
+          grid-template-columns: minmax(0, 1fr);
+        }
+        :host([data-md-preview]) [data-line-annotation] {
+          --diffs-line-bg: var(--diffs-bg);
         }
       `,
     }),

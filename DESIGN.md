@@ -293,7 +293,7 @@ a surface off the ground. There is **no elevation scale**.
 Shadows are a **closed set of four exceptions**, all of them things that float
 over arbitrary content and need to be readable against anything underneath:
 
-1. the gutter add-comment button
+1. the gutter add-comment button (and its twin in the markdown preview margin)
 2. the comment input overlay
 3. the settings popover
 4. the file comments drawer
@@ -337,6 +337,37 @@ invitation to write one.
 The viewed toggle animates its state change: the ring fills and the check
 scales in over 300ms rather than swapping. A toggle that records progress
 should feel like progress.
+
+## Markdown
+
+Comment bodies and the folder preview render as GFM (`react-markdown` +
+`remark-gfm`), styled by `.md-body` in `index.css` on the role tokens — no
+GitHub stylesheet. Two densities: `--compact` (13px, tight margins) for
+comments, `--normal` (14px) for the file preview. Inline and fenced code are
+*code*, so they are the one place mono appears outside the diff; links are
+`--accent`, since they are interactive; headings are the UI face at weight 600,
+not a display face. The rules are `@scope`d and stop at `.md-block-comments`,
+because comment cards sit inside the preview and must not inherit its density.
+
+- **The comment editor** is WYSIWYG (Lexical), read and written as markdown.
+  It renders the same tags under the same `.md-body--compact` rules as a read
+  comment, so **reading and editing are one box**: pressing edit swaps the
+  pencil for the formatting toolbar in the card's header row, and the text does
+  not move. The only growth is the Cancel/Save row underneath. The toolbar is
+  `IconButton compact` at `ICON_SIZE_INLINE` (bold, italic, inline code, link |
+  list, code block), `active` while the format applies at the caret; a link's
+  URL is typed in a field that takes the toolbar's place at its height. While
+  editing, the card's `--hair` border turns `--accent` on focus. A new comment
+  is the same card, with the file and line on the left of its header.
+- **The file preview** is folder mode only: a diff carries just its hunks,
+  which can't be rendered faithfully on their own, so diffs stay code. Folder
+  markdown opens rendered; a `SegmentedControl` of two icons (`CodeIcon` /
+  `EyeIcon`) in the file header switches it to source. It is a reading column
+  (`max-width: 56rem`) on the diff ground whose left margin works as a gutter:
+  each block's add-comment button is the gutter's own control (`IconButton
+  compact filled` with `shadow-float`), centred on the block's first line, and
+  a block's comments render under it as the same cards the code view shows
+  under a line.
 
 ## Motion
 

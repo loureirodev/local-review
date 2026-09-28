@@ -1,8 +1,16 @@
 // Handed to CodeView as slotted content, so these render in the light DOM and
 // keep the document's stylesheets: the shared button classes apply here.
 
-import { Button, IconButton } from "../Button";
-import { CheckIcon, ChevronRightIcon, CommentIcon, ICON_SIZE_INLINE, PlusIcon } from "../icons";
+import { Button, IconButton, SegmentedControl } from "../Button";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  CodeIcon,
+  CommentIcon,
+  EyeIcon,
+  ICON_SIZE_INLINE,
+  PlusIcon,
+} from "../icons";
 
 /** Smaller than `ICON_SIZE_INLINE`: this check is set inside a 12px ring. */
 const CHECK_GLYPH_SIZE = 11;
@@ -56,6 +64,70 @@ export function ViewedToggle({ viewed, onClick }: { viewed: boolean; onClick: ()
       </span>
       Viewed
     </Button>
+  );
+}
+
+const MARKDOWN_VIEWS = [
+  {
+    value: "source",
+    label: (
+      <>
+        <CodeIcon size={ICON_SIZE_INLINE} />
+        <span className="sr-only">Source</span>
+      </>
+    ),
+  },
+  {
+    value: "preview",
+    label: (
+      <>
+        <EyeIcon size={ICON_SIZE_INLINE} />
+        <span className="sr-only">Preview</span>
+      </>
+    ),
+  },
+] as const;
+
+/** Source or rendered view of a markdown file. */
+export function MarkdownViewToggle({
+  preview,
+  onChange,
+}: {
+  preview: boolean;
+  onChange: (preview: boolean) => void;
+}) {
+  return (
+    // The header toggles collapse on click; the control must not.
+    // biome-ignore lint/a11y/noStaticElementInteractions: only stops propagation
+    // biome-ignore lint/a11y/useKeyWithClickEvents: only stops propagation
+    <span onClick={(e) => e.stopPropagation()} title={preview ? "Show source" : "Show preview"}>
+      <SegmentedControl
+        aria-label="Markdown view"
+        value={preview ? "preview" : "source"}
+        options={MARKDOWN_VIEWS}
+        onChange={(view) => onChange(view === "preview")}
+      />
+    </span>
+  );
+}
+
+/** Floating add-comment control. The wrapper takes positioning and the shadow;
+ *  the button itself stays unstyled. */
+export function AddCommentButton({
+  className,
+  label,
+  onClick,
+}: {
+  className?: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <span className={`rounded-md shadow-float ${className ?? ""}`}>
+      <IconButton compact filled onClick={onClick} title={label} aria-label={label}>
+        <PlusIcon size={ICON_SIZE_INLINE} />
+      </IconButton>
+    </span>
   );
 }
 

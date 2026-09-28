@@ -220,6 +220,81 @@ export function CommentIcon({ size, className }: IconProps) {
   );
 }
 
+/** A markdown file's source view: angle brackets around a slash. */
+export function CodeIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M8 7 3 12l5 5" />
+      <path d="M16 7l5 5-5 5" />
+      <path d="M13.5 5 10.5 19" />
+    </Icon>
+  );
+}
+
+/* Comment editor formatting. Drawn as marks, not letters, so they stay icons
+   under the no-text-glyph rule. */
+export function BoldIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M7 5h5.5a3.5 3.5 0 0 1 0 7H7z" />
+      <path d="M7 12h6.5a3.5 3.5 0 0 1 0 7H7z" />
+    </Icon>
+  );
+}
+
+export function ItalicIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M10 5h8" />
+      <path d="M6 19h8" />
+      <path d="M14 5 10 19" />
+    </Icon>
+  );
+}
+
+export function LinkIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
+      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+    </Icon>
+  );
+}
+
+export function ListIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M9 6h11" />
+      <path d="M9 12h11" />
+      <path d="M9 18h11" />
+      <circle cx="4.5" cy="6" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none" />
+    </Icon>
+  );
+}
+
+/** A fenced code block: angle brackets inside a frame. */
+export function CodeBlockIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m10 9.5-2.5 2.5 2.5 2.5" />
+      <path d="m14 9.5 2.5 2.5-2.5 2.5" />
+    </Icon>
+  );
+}
+
+/** A markdown file's rendered preview. */
+export function EyeIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  );
+}
+
 export function SidebarIcon({ collapsed, size }: { collapsed: boolean } & IconProps) {
   return (
     <Icon size={size}>

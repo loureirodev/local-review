@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { listFolder, MAX_FILE_BYTES, readFolderFile } from "./folder";
+import { listFolder, MAX_FILE_BYTES, readFolderFile, resolveFolderImage } from "./folder";
 
 let base: string;
 let root: string;
@@ -107,5 +107,28 @@ describe("readFolderFile", () => {
     expect(await readFolderFile(root, "nope.md")).toEqual({ error: "not-found" });
     expect(await readFolderFile(root, "img.png")).toEqual({ error: "binary" });
     expect(await readFolderFile(root, "big.txt")).toEqual({ error: "too-large" });
+  });
+});
+
+describe("resolveFolderImage", () => {
+  test("locates an image under the root with its content type", async () => {
+    await mkdir(join(root, "docs"));
+    await writeFile(join(root, "docs/a.svg"), "<svg/>");
+
+    expect(await resolveFolderImage(root, "docs/a.svg")).toEqual({
+      path: join(await realpath(root), "docs/a.svg"),
+      type: "image/svg+xml",
+    });
+  });
+
+  test("refuses non-images, traversal and missing files", async () => {
+    await writeFile(join(root, "notes.md"), "text");
+    await writeFile(join(base, "secret.png"), "outside");
+    await symlink(join(base, "secret.png"), join(root, "escape.png"));
+
+    expect(await resolveFolderImage(root, "notes.md")).toEqual({ error: "unsupported" });
+    expect(await resolveFolderImage(root, "../secret.png")).toEqual({ error: "traversal" });
+    expect(await resolveFolderImage(root, "escape.png")).toEqual({ error: "traversal" });
+    expect(await resolveFolderImage(root, "nope.png")).toEqual({ error: "not-found" });
   });
 });
