@@ -16,7 +16,7 @@ import {
   isDisplaySettingsKey,
 } from "../shared/types";
 import { patchSettings, readSettings } from "./config";
-import { listFolder, readFolderFile } from "./folder";
+import { listFolder, readFolderFile, resolveFolderImage } from "./folder";
 import { getCheckout, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
 import { deserializeReview } from "./xml-deserializer";
 import { serializeReview } from "./xml-serializer";
@@ -128,6 +128,27 @@ async function handleApiRequest(req: Request, url: URL, opts: ServerOptions): Pr
         // Traversal answers like a missing file: nothing outside the root exists.
         return jsonResponse({ error: "File not found" }, 404);
     }
+  }
+
+  // GET /api/folder/image?path=<relative> — an image a markdown preview embeds
+  if (pathname === "/api/folder/image" && req.method === "GET") {
+    if (opts.source.type !== "folder") {
+      return jsonResponse({ error: "Not in folder mode" }, 400);
+    }
+    const result = await resolveFolderImage(opts.source.path, url.searchParams.get("path") ?? "");
+    if ("error" in result) {
+      return jsonResponse({ error: "Image not found" }, result.error === "too-large" ? 413 : 404);
+    }
+    return new Response(Bun.file(result.path), {
+      headers: {
+        "Content-Type": result.type,
+        // An SVG opened directly is a document: keep its scripts from running
+        // on the app's origin.
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-cache",
+      },
+    });
   }
 
   // GET /api/review — load existing review from XML file (null if --existing not set or file absent)

@@ -4,6 +4,7 @@ import type { DiffSource, ReviewComment } from "@shared/types.js";
 import type { Element, ElementContent, Root, RootContent } from "hast";
 import { type ComponentPropsWithoutRef, createElement, memo, type ReactNode, useMemo } from "react";
 import type { Components } from "react-markdown";
+import { folderImageSrc } from "../../utils/folderImage";
 import CommentDisplay from "../CommentDisplay";
 import { AddCommentButton } from "../diff/HeaderControls";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -106,7 +107,20 @@ export default memo(function MarkdownPreview({
     // Filled by the rehype pass, which runs before the components render.
     let owners = new Map<Element, ReviewComment[]>();
     const rehypeAssignComments = () => (tree: Root) => {
-      owners = assignComments(collectBlocks(tree), comments);
+      const blocks = collectBlocks(tree);
+      owners = assignComments(blocks, comments);
+      // With no block to sit under (an empty file, one only of rules or HTML),
+      // the comments go in a holder after whatever renders, so none is lost.
+      if (blocks.length === 0) {
+        const lined = comments
+          .filter((comment) => comment.line !== null)
+          .sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+        if (lined.length > 0) {
+          const holder: Element = { type: "element", tagName: "div", properties: {}, children: [] };
+          tree.children.push(holder);
+          owners.set(holder, lined);
+        }
+      }
     };
 
     // The same control as the gutter's, in the column's left margin, aligned
@@ -162,17 +176,32 @@ export default memo(function MarkdownPreview({
       </li>
     );
 
-    const result: Record<string, unknown> = { li };
+    const div = ({ node, ...props }: BlockProps) =>
+      node && owners.has(node) ? blockComments(node) : <div {...props} />;
+
+    const img = ({
+      node: _node,
+      src,
+      alt,
+      ...props
+    }: ComponentPropsWithoutRef<"img"> & { node?: Element }) => (
+      <img
+        {...props}
+        alt={alt}
+        src={typeof src === "string" ? folderImageSrc(filePath, src) : src}
+      />
+    );
+
+    const result: Record<string, unknown> = { li, div, img };
     for (const tag of WRAPPED_TAGS) result[tag] = block(tag);
     return { components: result as Components, rehypePlugins: [rehypeAssignComments] };
   }, [filePath, comments, source, onRequestComment, onDeleteComment, onUpdateComment]);
 
-  if (!content.trim()) {
-    return <div className="px-4 py-6 text-center text-[13px] text-muted">Nothing to preview</div>;
-  }
-
   return (
     <div className="md-preview">
+      {content.trim() ? null : (
+        <div className="py-6 text-center text-[13px] text-muted">Nothing to preview</div>
+      )}
       <MarkdownRenderer density="normal" components={components} rehypePlugins={rehypePlugins}>
         {content}
       </MarkdownRenderer>

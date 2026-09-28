@@ -136,8 +136,12 @@ export async function listFolder(root: string): Promise<FolderTreeResponse> {
   return listing;
 }
 
-/** Read one file under `root`, refusing anything that resolves outside it. */
-export async function readFolderFile(root: string, relPath: string): Promise<FolderFileResult> {
+/** The real path of `relPath` under `root`, refusing anything that resolves
+ *  outside it. */
+async function resolveInRoot(
+  root: string,
+  relPath: string,
+): Promise<string | { error: "not-found" | "traversal" }> {
   if (!relPath || isAbsolute(relPath) || relPath.split(/[\\/]/).includes("..")) {
     return { error: "traversal" };
   }
@@ -152,6 +156,13 @@ export async function readFolderFile(root: string, relPath: string): Promise<Fol
     return { error: "not-found" };
   }
   if (!isInside(realRoot, target)) return { error: "traversal" };
+  return target;
+}
+
+/** Read one file under `root`, refusing anything that resolves outside it. */
+export async function readFolderFile(root: string, relPath: string): Promise<FolderFileResult> {
+  const target = await resolveInRoot(root, relPath);
+  if (typeof target !== "string") return target;
 
   // An unreadable file answers like a missing one: there is nothing to show.
   try {
@@ -165,6 +176,42 @@ export async function readFolderFile(root: string, relPath: string): Promise<Fol
     const bytes = await Bun.file(target).bytes();
     if (hasNullByte(bytes)) return { error: "binary" };
     return { content: new TextDecoder().decode(bytes) };
+  } catch {
+    return { error: "not-found" };
+  }
+}
+
+/** Images a markdown preview may embed from the folder, by extension. */
+const IMAGE_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".svg": "image/svg+xml",
+};
+
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+export type FolderImageResult =
+  | { path: string; type: string }
+  | { error: "not-found" | "traversal" | "unsupported" | "too-large" };
+
+/** Locate an image under `root` for a markdown preview to embed. */
+export async function resolveFolderImage(
+  root: string,
+  relPath: string,
+): Promise<FolderImageResult> {
+  const type = IMAGE_TYPES[extname(relPath).toLowerCase()];
+  if (!type) return { error: "unsupported" };
+  const target = await resolveInRoot(root, relPath);
+  if (typeof target !== "string") return target;
+  try {
+    const info = await stat(target);
+    if (!info.isFile()) return { error: "not-found" };
+    if (info.size > MAX_IMAGE_BYTES) return { error: "too-large" };
+    return { path: target, type };
   } catch {
     return { error: "not-found" };
   }
