@@ -68,7 +68,8 @@ export function IconButton({
 }
 
 /** A row of mutually exclusive options (diff mode, diff layout). The selected
- *  one lifts to the page ground inside a `bg-track` well. */
+ *  one lifts to the page ground inside a `bg-track` well. An option whose label
+ *  is only an icon takes a `title`, which is also its accessible name. */
 export function SegmentedControl<T extends string>({
   value,
   options,
@@ -76,7 +77,7 @@ export function SegmentedControl<T extends string>({
   "aria-label": ariaLabel,
 }: {
   value: T;
-  options: ReadonlyArray<{ value: T; label: ReactNode }>;
+  options: ReadonlyArray<{ value: T; label: ReactNode; title?: string }>;
   onChange: (value: T) => void;
   "aria-label": string;
 }) {
@@ -91,6 +92,8 @@ export function SegmentedControl<T extends string>({
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={option.value === value}
+          title={option.title}
+          aria-label={option.title}
           className={`flex items-center justify-center gap-1.5 flex-1 px-2.5 py-1 text-xs font-medium rounded-[5px] transition-colors ${
             option.value === value ? "bg-bg text-text" : "text-muted hover:text-text"
           }`}
@@ -140,6 +143,25 @@ export function ToggleRow({
       <span className="text-muted group-hover:text-text transition-colors">{icon}</span>
       <span className="text-text flex-1 text-left">{label}</span>
       <span className="toggle-switch" data-checked={String(checked)} aria-hidden="true" />
+    </button>
+  );
+}
+
+/** A list row that is itself the button — a comment in the navigator, a file
+ *  group's header. Takes its display, padding and border from the call site;
+ *  the shape (full width, left-aligned, `hover:bg-track`) is fixed here. */
+export function RowButton({
+  className = "",
+  children,
+  ...props
+}: NativeButtonProps & { className?: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={`w-full text-left transition-colors hover:bg-track focus-visible:outline-none focus-visible:bg-track ${className}`}
+      {...props}
+    >
+      {children}
     </button>
   );
 }

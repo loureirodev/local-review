@@ -1,44 +1,32 @@
-import { parsePatchFiles } from "@pierre/diffs";
-import type { DiffLineAnnotation } from "@pierre/diffs/react";
-import type { FileReviewState, ReviewComment } from "@shared/types.js";
+import type { DiffLineAnnotation, FileDiffMetadata } from "@pierre/diffs/react";
+import type { FileReviewState, ReviewComment } from "@shared/types";
 import { useMemo } from "react";
-import { compareByTreeOrder } from "../../utils/treeOrder";
-import { type CommentAnnotation, getVisibleLines, splitComments } from "./diffParsing";
+import { type CommentAnnotation, getVisibleLines, splitComments, toDiffSide } from "./diffParsing";
 
 export interface DiffData {
-  allFileDiffs: ReturnType<typeof parsePatchFiles>[number]["files"] | null;
   lineAnnotationsByFile: Map<string, DiffLineAnnotation<CommentAnnotation>[]>;
   fileLevelCommentsByFile: Map<string, ReviewComment[]>;
 }
 
-export function useDiffData(patch: string, reviewFiles: Record<string, FileReviewState>): DiffData {
-  const allFileDiffs = useMemo(() => {
-    if (!patch) return null;
-    try {
-      const parsed = parsePatchFiles(patch);
-      return parsed
-        .flatMap((parsedPatch) => parsedPatch.files)
-        .sort((a, b) => compareByTreeOrder(a.name, b.name));
-    } catch {
-      return null;
-    }
-  }, [patch]);
-
+/** `fileDiffs` are parsed (and sorted) once, by the app. */
+export function useDiffData(
+  fileDiffs: FileDiffMetadata[],
+  reviewFiles: Record<string, FileReviewState>,
+): DiffData {
   const visibleLinesByFile = useMemo(() => {
     const map = new Map<string, { additions: Set<number>; deletions: Set<number> }>();
-    if (!allFileDiffs) return map;
-    for (const fd of allFileDiffs) {
+    for (const fd of fileDiffs) {
       map.set(fd.name, getVisibleLines(fd));
     }
     return map;
-  }, [allFileDiffs]);
+  }, [fileDiffs]);
 
   const { lineAnnotationsByFile, fileLevelCommentsByFile } = useMemo(
     () =>
       splitComments(
         reviewFiles,
         (filePath, comment, line): DiffLineAnnotation<CommentAnnotation> | null => {
-          const side = comment.side === "deletion" ? "deletions" : "additions";
+          const side = toDiffSide(comment.side);
           if (!visibleLinesByFile.get(filePath)?.[side].has(line)) return null;
           return { side, lineNumber: line, metadata: { comments: [comment] } };
         },
@@ -46,9 +34,5 @@ export function useDiffData(patch: string, reviewFiles: Record<string, FileRevie
     [reviewFiles, visibleLinesByFile],
   );
 
-  return {
-    allFileDiffs,
-    lineAnnotationsByFile,
-    fileLevelCommentsByFile,
-  };
+  return { lineAnnotationsByFile, fileLevelCommentsByFile };
 }

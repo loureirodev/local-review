@@ -1,65 +1,11 @@
-import type { DiffSource, ReviewComment } from "@shared/types.js";
+import type { DiffSource, ReviewComment } from "@shared/types";
 import { memo, useCallback, useState } from "react";
 import { IconButton } from "./Button";
 import { CommentCard, CommentFormFooter } from "./CommentCard";
-import {
-  AgentIcon,
-  CloseIcon,
-  GitHubIcon,
-  GitLabIcon,
-  ICON_SIZE_INLINE,
-  PencilIcon,
-  UserIcon,
-} from "./icons";
+import { CloseIcon, ICON_SIZE_INLINE, PencilIcon } from "./icons";
 import { Markdown } from "./markdown/Markdown";
 import { MarkdownEditor, preloadMarkdownEditor } from "./markdown/MarkdownEditor";
-
-function OriginIcon({ source, url }: { source: DiffSource | null; url?: string }) {
-  if (!source) return null;
-
-  let icon: React.ReactNode;
-  let tooltip: string | undefined;
-
-  switch (source.type) {
-    case "github-pr":
-      icon = <GitHubIcon size={ICON_SIZE_INLINE} />;
-      tooltip = url ? "Open original comment on GitHub" : "GitHub comment";
-      break;
-    case "gitlab-mr":
-      icon = <GitLabIcon size={ICON_SIZE_INLINE} />;
-      tooltip = url ? "Open original comment on GitLab" : "GitLab comment";
-      break;
-    case "agent":
-      icon = <AgentIcon size={ICON_SIZE_INLINE} />;
-      tooltip = "AI agent review";
-      break;
-    case "branch":
-    case "pending":
-    case "folder":
-      icon = <UserIcon size={ICON_SIZE_INLINE} />;
-      tooltip = "Local comment";
-      break;
-    default:
-      return null;
-  }
-
-  if (url && (source.type === "github-pr" || source.type === "gitlab-mr")) {
-    return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={tooltip}
-        className="text-muted hover:text-text transition-colors"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {icon}
-      </a>
-    );
-  }
-
-  return <span title={tooltip}>{icon}</span>;
-}
+import { OriginIcon } from "./OriginIcon";
 
 interface CommentDisplayProps {
   comment: ReviewComment;
@@ -98,6 +44,7 @@ const CommentDisplay = memo(function CommentDisplay({
   return (
     <CommentCard
       className="mx-1 my-1"
+      commentId={comment.id}
       writing={editing}
       header={
         <>

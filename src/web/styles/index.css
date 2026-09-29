@@ -138,8 +138,8 @@ body {
 }
 
 /* The closed set of shadow exceptions: the gutter add-comment button, the
-   comment input overlay, the settings popover and the comments drawer. Nothing
-   else in the app casts a shadow. See DESIGN.md. */
+   comment input overlay, the settings popover, the comments drawer and the
+   shortcuts dialog. Nothing else in the app casts a shadow. */
 .shadow-float {
   box-shadow: var(--shadow-float);
 }
@@ -212,6 +212,29 @@ body {
 
 .drawer-content[data-state="closed"] {
   animation: drawer-out 150ms ease-in;
+}
+
+/* The shortcuts help: a small centred surface on the drawer's scrim. */
+.dialog-content {
+  @apply fixed top-1/2 left-1/2 z-50 rounded-lg;
+  box-shadow: var(--shadow-float-lg);
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  transform: translate(-50%, -50%);
+  background: var(--color-bg);
+  border: 1px solid var(--color-hair);
+  animation: overlay-in 150ms ease-out;
+}
+
+.dialog-content[data-state="closed"] {
+  animation: overlay-out 150ms ease-in;
+}
+
+/* A key as it is pressed: the search hint, the shortcuts help, the comment
+   form's submit hint. UI face, not mono: it names a key, it is not code. */
+.key-cap {
+  @apply inline-flex items-center justify-center h-4 min-w-4 px-1 rounded bg-track text-muted text-[10px] leading-none font-medium;
+  font-family: var(--font-body);
 }
 
 @keyframes overlay-in {

@@ -1,6 +1,6 @@
 // Loaded on demand, the first time a folder's markdown file renders.
 
-import type { DiffSource, ReviewComment } from "@shared/types.js";
+import type { DiffSource, ReviewComment } from "@shared/types";
 import type { Element, ElementContent, Root, RootContent } from "hast";
 import { type ComponentPropsWithoutRef, createElement, memo, type ReactNode, useMemo } from "react";
 import type { Components } from "react-markdown";

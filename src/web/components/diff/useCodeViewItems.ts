@@ -4,7 +4,7 @@ import type {
   FileContents,
   LineAnnotation,
 } from "@pierre/diffs/react";
-import type { FileReviewState, ReviewComment } from "@shared/types.js";
+import type { FileReviewState, ReviewComment } from "@shared/types";
 import { useCallback, useMemo, useRef } from "react";
 import type {
   CommentAnnotation,

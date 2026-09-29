@@ -1,4 +1,4 @@
-import type { DiffSource, FileReviewState, ReviewComment, ReviewState } from "@shared/types.js";
+import type { DiffSource, FileReviewState, ReviewComment, ReviewState } from "@shared/types";
 import { createContext, type Dispatch, type ReactNode, use, useCallback, useReducer } from "react";
 
 // ===== State =====

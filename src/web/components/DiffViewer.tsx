@@ -1,21 +1,23 @@
 import type {
   CodeViewHandle,
   DiffLineAnnotation,
+  FileDiffMetadata,
   LineAnnotation,
   PostRenderPhase,
 } from "@pierre/diffs/react";
 import { CodeView, WorkerPoolContextProvider } from "@pierre/diffs/react";
-import type { FileReviewState, ReviewComment } from "@shared/types.js";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FileReviewState, ReviewComment } from "@shared/types";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCollapse } from "../context/CollapseContext";
 import { useReview } from "../context/ReviewContext";
+import { useMountEffect } from "../hooks/useMountEffect";
 import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import CommentDisplay from "./CommentDisplay";
 import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay";
 import { HIGHLIGHTER_OPTIONS, THEME, WORKER_POOL_OPTIONS } from "./diff/constants";
 import type { CommentAnnotation, FolderFileState, ViewerEntry } from "./diff/diffParsing";
-import { EMPTY_COMMENTS } from "./diff/diffParsing";
+import { EMPTY_COMMENTS, toDiffSide } from "./diff/diffParsing";
 import {
   AddCommentButton,
   FileCommentBadge,
@@ -34,7 +36,7 @@ const MarkdownPreview = lazy(() => import("./markdown/MarkdownPreview"));
 /** What the viewer shows: a git patch, or the files of a folder (folder mode),
  *  whose contents are requested through `onLoadFile` as files expand. */
 export type ViewerContent =
-  | { kind: "diff"; patch: string }
+  | { kind: "diff"; fileDiffs: FileDiffMetadata[] }
   | {
       kind: "folder";
       paths: string[];
@@ -43,6 +45,18 @@ export type ViewerContent =
       onLoadFile: (path: string, priority?: boolean) => void;
     };
 
+/** Where the viewer is sent: a file's section, or a comment in it. */
+export interface NavigationTarget {
+  file: string;
+  /** A line comment to scroll to. Absent: the file's section. */
+  comment?: { id: string; line: number; side: ReviewComment["side"] };
+  /** Open the file's comments drawer instead of scrolling. */
+  openDrawer?: boolean;
+  /** A file-level or orphaned comment reached without opening the drawer: the
+   *  section's comment badge pulses, so the reviewer sees where it lives. */
+  fileComment?: boolean;
+}
+
 interface DiffViewerProps {
   content: ViewerContent;
   /** Identity of the diff being viewed (mode + branches). Changing it remounts
@@ -50,15 +64,17 @@ interface DiffViewerProps {
    *  start at the top. Changes to the *contents* of the same diff keep the key
    *  and are reconciled in place, preserving the reader's position (D8). */
   diffKey: string;
-  navigationTargetFile: string | null;
+  navigationTarget: NavigationTarget | null;
   reviewFiles: Record<string, FileReviewState>;
-  onNavigationHandled: (filePath: string) => void;
+  /** Called once the target is acted on, with that target. */
+  onNavigationHandled: (target: NavigationTarget) => void;
   onAddComment: (comment: ReviewComment) => void;
   onDeleteComment: (filePath: string, commentId: string) => void;
   onUpdateComment: (filePath: string, commentId: string, body: string) => void;
 }
 
 const EMPTY_PATHS: string[] = [];
+const EMPTY_FILE_DIFFS: FileDiffMetadata[] = [];
 const EMPTY_FOLDER_FILES: Record<string, FolderFileState> = {};
 
 /** Stable across renders on purpose — see `codeViewOptions`. */
@@ -70,9 +86,21 @@ const HEADER_LINE_HEIGHT = 20;
 
 /** How long the flash tint takes to fade, once the target section is on screen. */
 const NAVIGATION_FLASH_MS = 1400;
+/** The file comment badge's pulse: a ring, repeated so it is noticed. */
+const BADGE_PULSE_MS = 700;
+const BADGE_PULSE_COUNT = 3;
 /** When the flash rule is dropped. Must outlast a smooth scroll plus the fade;
  *  the visible timing is the CSS animation's, not this. */
 const NAVIGATION_FLASH_CLEANUP_MS = 5000;
+
+/** Room left above a comment in a markdown preview, for the sticky file header. */
+const PREVIEW_COMMENT_MARGIN = 72;
+/** Frames to wait for a preview's comment to render (the preview is lazy). */
+const PREVIEW_FIND_FRAMES = 30;
+
+/** What the navigation flash tints: a file's section (`fileComment`: and its
+ *  comment badge) or one comment. */
+type Flash = { kind: "file" | "comment"; id: string; fileComment?: boolean };
 
 // `getHoveredLine()` returns the file-mode shape (`{ lineNumber }`) for folder
 // items or the diff-mode shape (`{ lineNumber, side }`) for diff items.
@@ -86,7 +114,7 @@ function isPreviewItem(item: DiffCodeViewItem): boolean {
 function DiffViewerInner({
   content,
   diffKey,
-  navigationTargetFile,
+  navigationTarget,
   reviewFiles,
   onNavigationHandled,
   onAddComment,
@@ -108,15 +136,16 @@ function DiffViewerInner({
 
   // Both hooks run every render (hooks can't be conditional); the idle one
   // gets empty input.
-  const diffData = useDiffData(content.kind === "diff" ? content.patch : "", reviewFiles);
+  const fileDiffs = content.kind === "diff" ? content.fileDiffs : EMPTY_FILE_DIFFS;
+  const diffData = useDiffData(fileDiffs, reviewFiles);
   const folderData = useFolderData(
     folder?.paths ?? EMPTY_PATHS,
     folder?.files ?? EMPTY_FOLDER_FILES,
     reviewFiles,
   );
   const diffEntries = useMemo<ViewerEntry[]>(
-    () => (diffData.allFileDiffs ?? []).map((fileDiff) => ({ type: "diff", fileDiff })),
-    [diffData.allFileDiffs],
+    () => fileDiffs.map((fileDiff) => ({ type: "diff", fileDiff })),
+    [fileDiffs],
   );
   const { entries, lineAnnotationsByFile, fileLevelCommentsByFile } = folder
     ? folderData
@@ -146,7 +175,7 @@ function DiffViewerInner({
   // applied after the collapse `updateItem` lands (in the bridge effect).
   const pendingAnchorRef = useRef<{ id: string; itemTop: number } | null>(null);
 
-  const [flashedFile, setFlashedFile] = useState<string | null>(null);
+  const [flash, setFlash] = useState<Flash | null>(null);
   const [activeInput, setActiveInput] = useState<ActiveInput | null>(null);
   const [drawerState, setDrawerState] = useState<{
     filePath: string;
@@ -251,47 +280,139 @@ function DiffViewerInner({
     }
   }, [folderPaths, onLoadFile, getIsCollapsed]);
 
-  // Navigation: scroll to the target file's section and flash it.
+  // A preview comment is found a few frames after the jump; a newer navigation
+  // or an unmount cancels the search.
+  const navFrameRef = useRef(0);
+  useMountEffect(() => () => cancelAnimationFrame(navFrameRef.current));
+
+  /** Brings a comment inside a markdown preview into view: its offset in the
+   *  item is measured once, after the jump to the item has rendered it. Never
+   *  on scroll — reading positions while CodeView scrolls destabilises it. */
+  const scrollToPreviewComment = useCallback((filePath: string, commentId: string) => {
+    let frames = 0;
+    const step = () => {
+      const container = document.querySelector(
+        `diffs-container[data-file-id="${CSS.escape(filePath)}"]`,
+      );
+      const card = container?.querySelector(`[data-comment-id="${CSS.escape(commentId)}"]`);
+      if (container && card) {
+        const offset = card.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        codeViewRef.current?.scrollTo({
+          type: "item",
+          id: filePath,
+          align: "start",
+          offset: PREVIEW_COMMENT_MARGIN - offset,
+          behavior: "smooth",
+        });
+        return;
+      }
+      // Not rendered yet: retry, and after PREVIEW_FIND_FRAMES stay at the file.
+      if (++frames < PREVIEW_FIND_FRAMES) navFrameRef.current = requestAnimationFrame(step);
+    };
+    navFrameRef.current = requestAnimationFrame(step);
+  }, []);
+
+  // Navigation: scroll to the target file's section or comment, and flash it.
+  const folderFiles = folder?.files;
   useEffect(() => {
-    if (!navigationTargetFile) return;
-    // Folder files start collapsed; picking one in the tree means reading it,
-    // first, and retrying it if its last fetch failed.
-    if (onLoadFile) {
-      onLoadFile(navigationTargetFile, true);
-      if (getIsCollapsed(navigationTargetFile)) toggleFile(navigationTargetFile);
+    const target = navigationTarget;
+    if (!target) return;
+    const { file, comment } = target;
+    cancelAnimationFrame(navFrameRef.current);
+
+    if (target.openDrawer) {
+      openDrawer(file, false);
+      onNavigationHandled(target);
+      return;
     }
-    codeViewRef.current?.scrollTo({
-      type: "item",
-      id: navigationTargetFile,
-      align: "start",
-      behavior: "smooth",
-    });
-    setFlashedFile(navigationTargetFile);
-    // Clears `navigationTargetFile` so a re-render can't re-scroll. The flash is
-    // held separately: keying it off the navigation target would clear it in the
-    // same tick, before the reviewer ever sees it.
-    onNavigationHandled(navigationTargetFile);
-  }, [navigationTargetFile, onNavigationHandled, onLoadFile, getIsCollapsed, toggleFile]);
+
+    // Folder files start collapsed; picking one means reading it, first, and
+    // retrying it if its last fetch failed.
+    if (onLoadFile) onLoadFile(file, true);
+
+    const scrollToFile = () => {
+      codeViewRef.current?.scrollTo({ type: "item", id: file, align: "start", behavior: "smooth" });
+      setFlash({ kind: "file", id: file, fileComment: target.fileComment });
+    };
+
+    if (!comment) {
+      if (onLoadFile && getIsCollapsed(file)) toggleFile(file);
+      scrollToFile();
+    } else {
+      // A line needs the file open and, in folder mode, loaded: the target is
+      // kept and this effect re-runs once each has happened.
+      if (getIsCollapsed(file)) {
+        toggleFile(file);
+        return;
+      }
+      const folderFile = folderFiles?.[file];
+      if (folderFiles && !folderFile) return;
+      if (folderFile?.status === "error") {
+        scrollToFile();
+      } else if (getPreview(file) !== null) {
+        codeViewRef.current?.scrollTo({
+          type: "item",
+          id: file,
+          align: "start",
+          behavior: "instant",
+        });
+        scrollToPreviewComment(file, comment.id);
+        setFlash({ kind: "comment", id: comment.id });
+      } else {
+        // Re-resolved by CodeView every frame, so a far file that is not
+        // measured yet still ends on the line.
+        codeViewRef.current?.scrollTo({
+          type: "line",
+          id: file,
+          lineNumber: comment.line,
+          side: toDiffSide(comment.side),
+          align: "center",
+          behavior: "smooth",
+        });
+        setFlash({ kind: "comment", id: comment.id });
+      }
+    }
+    // Clears the target so a re-render can't re-scroll. The flash is held
+    // separately: keying it off the target would clear it in the same tick,
+    // before the reviewer ever sees it.
+    onNavigationHandled(target);
+  }, [
+    navigationTarget,
+    onNavigationHandled,
+    onLoadFile,
+    folderFiles,
+    getIsCollapsed,
+    toggleFile,
+    getPreview,
+    openDrawer,
+    scrollToPreviewComment,
+  ]);
 
   // Drop the flash rule well after the animation has finished. The fade itself is
   // the CSS animation below, not this timer.
   useEffect(() => {
-    if (!flashedFile) return;
-    const timer = setTimeout(() => setFlashedFile(null), NAVIGATION_FLASH_CLEANUP_MS);
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(null), NAVIGATION_FLASH_CLEANUP_MS);
     return () => clearTimeout(timer);
-  }, [flashedFile]);
+  }, [flash]);
 
-  // Tint the file the reviewer was just sent to. Targets the container by the
-  // `data-file-id` stamped in `handlePostRender` — CodeView itself leaves these
-  // elements attribute-less, so without that stamp this selector matches nothing.
+  // Tint the file or comment the reviewer was just sent to. Files match the
+  // `data-file-id` stamped in `handlePostRender` (CodeView leaves none).
   useEffect(() => {
     if (!styleRef.current) {
       styleRef.current = document.createElement("style");
       styleRef.current.setAttribute("data-selected-file-css", "");
       document.head.appendChild(styleRef.current);
     }
-    if (flashedFile) {
-      const escaped = flashedFile.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    if (flash) {
+      const selector =
+        flash.kind === "file"
+          ? `diffs-container[data-file-id="${CSS.escape(flash.id)}"]`
+          : `[data-comment-id="${CSS.escape(flash.id)}"]`;
+      // A comment card has its own fill, so it fades back to it.
+      const rest = flash.kind === "file" ? "transparent" : "var(--color-panel)";
+      // The badge is slotted into the section's header, so it is light DOM too.
+      const badge = flash.fileComment ? `${selector} [data-file-comment-badge]` : null;
       // A CSS animation rather than a JS-timed tint: it starts when the element
       // begins matching the selector, i.e. when the target section mounts at the
       // end of the smooth scroll. A timer started at click time would instead
@@ -300,19 +421,25 @@ function DiffViewerInner({
       styleRef.current.textContent = `
         @keyframes local-review-navigation-flash {
           from { background-color: color-mix(in oklab, var(--color-accent) 16%, transparent); }
-          to { background-color: transparent; }
+          to { background-color: ${rest}; }
         }
-        diffs-container[data-file-id="${escaped}"] {
+        @keyframes local-review-badge-pulse {
+          from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 60%, transparent); }
+          to { box-shadow: 0 0 0 6px transparent; }
+        }
+        ${selector} {
           animation: local-review-navigation-flash ${NAVIGATION_FLASH_MS}ms ease-out;
         }
+        ${badge ? `${badge} { animation: local-review-badge-pulse ${BADGE_PULSE_MS}ms ease-out ${BADGE_PULSE_COUNT}; }` : ""}
         @media (prefers-reduced-motion: reduce) {
-          diffs-container[data-file-id="${escaped}"] { animation: none; }
+          ${selector} { animation: none; }
+          ${badge ? `${badge} { animation: none; outline: 2px solid var(--color-accent); outline-offset: 2px; }` : ""}
         }
       `;
     } else {
       styleRef.current.textContent = "";
     }
-  }, [flashedFile]);
+  }, [flash]);
 
   // Stamp the file id on each item's rendered container. CodeView leaves these
   // elements attribute-less and recycles them between items, so this is the only
@@ -577,7 +704,8 @@ function DiffViewerInner({
   );
 }
 
-export default function DiffViewer(props: DiffViewerProps) {
+// Memoized: typing in the sidebar search re-renders the app, not the viewer.
+export default memo(function DiffViewer(props: DiffViewerProps) {
   return (
     <WorkerPoolContextProvider
       poolOptions={WORKER_POOL_OPTIONS}
@@ -586,4 +714,4 @@ export default function DiffViewer(props: DiffViewerProps) {
       <DiffViewerInner {...props} />
     </WorkerPoolContextProvider>
   );
-}
+});

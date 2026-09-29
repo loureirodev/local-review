@@ -1,4 +1,4 @@
-import type { ReviewComment } from "@shared/types.js";
+import type { ReviewComment } from "@shared/types";
 import CommentInput from "../CommentInput";
 
 export interface ActiveInput {

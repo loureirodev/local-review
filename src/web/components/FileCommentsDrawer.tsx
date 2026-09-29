@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import type { DiffSource, ReviewComment } from "@shared/types.js";
+import type { DiffSource, ReviewComment } from "@shared/types";
 import { useCallback, useRef, useState } from "react";
 import { Button, IconButton } from "./Button";
 import CommentDisplay from "./CommentDisplay";

@@ -220,6 +220,27 @@ export function CommentIcon({ size, className }: IconProps) {
   );
 }
 
+/** A file: the sidebar's Files view. */
+export function FileIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" />
+      <path d="M14 3v5h5" />
+    </Icon>
+  );
+}
+
+/** A question mark in a circle: the keyboard shortcuts help. */
+export function HelpIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6" />
+      <path d="M12 17h.01" />
+    </Icon>
+  );
+}
+
 /** A markdown file's source view: angle brackets around a slash. */
 export function CodeIcon({ size, className }: IconProps) {
   return (
