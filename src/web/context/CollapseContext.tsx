@@ -1,4 +1,4 @@
-import type { FileReviewState } from "@shared/types.js";
+import type { FileReviewState } from "@shared/types";
 import {
   createContext,
   type ReactNode,
@@ -29,7 +29,6 @@ interface CollapseContextValue {
   getIsCollapsed: (filePath: string) => boolean;
   toggleFile: (filePath: string) => void;
   setAllCollapsed: (collapsed: boolean) => void;
-  collapsedCount: number;
   totalFiles: number;
 }
 
@@ -121,23 +120,14 @@ export function CollapseProvider({
     });
   }, [reviewFiles]);
 
-  const collapsedCount = useMemo(() => {
-    let count = 0;
-    for (const path of filePaths) {
-      if (getIsCollapsed(path)) count++;
-    }
-    return count;
-  }, [filePaths, getIsCollapsed]);
-
   const value = useMemo<CollapseContextValue>(
     () => ({
       getIsCollapsed,
       toggleFile,
       setAllCollapsed,
-      collapsedCount,
       totalFiles: filePaths.length,
     }),
-    [getIsCollapsed, toggleFile, setAllCollapsed, collapsedCount, filePaths.length],
+    [getIsCollapsed, toggleFile, setAllCollapsed, filePaths.length],
   );
 
   return <CollapseContext.Provider value={value}>{children}</CollapseContext.Provider>;

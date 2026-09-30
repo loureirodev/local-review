@@ -207,7 +207,11 @@ not here, the shape is added here, with its row in this table.
 | `<IconButton filled>` | same square, with the neutral `bg-track` → `hover:bg-hair` fill at rest | an icon button that must be findable without hovering — adding a comment, in the file header and in the gutter |
 | `<SegmentedControl>` | a `bg-track` well; each option `px-2.5 py-1 text-xs font-medium`, the selected one lifted to `bg-bg` | exactly one of a few options — the diff mode, the diff layout |
 | `<ToggleRow>` | a full-width settings row that is the button, with a `.toggle-switch` on the right | an on/off setting in the popover |
-| `<LinkButton>` | text only, `text-muted` → `hover:text-text`, no shape | an action set inside a line of metadata that already has a shape — "Collapse all" in the tree footer |
+| `<LinkButton>` | text only, `text-muted` → `hover:text-text`, no shape | an action set inside a line of metadata that already has a shape — "Collapse all" in the sidebar footer |
+| `<RowButton>` | full width, left-aligned, `hover:bg-track`; display, padding and border from the call site | a list row that is itself the button — a comment card and a file group header in the Comments view |
+
+A `SegmentedControl` option whose label is only an icon passes a `title`, which
+is also its accessible name — the Files/Comments switch.
 
 `IconButton` takes `active` for a trigger whose surface is open (it reads held
 down, not merely hovered) and `tone="danger"` for a destructive hover — the only
@@ -297,6 +301,7 @@ over arbitrary content and need to be readable against anything underneath:
 2. the comment input overlay
 3. the settings popover
 4. the file comments drawer
+5. the keyboard shortcuts dialog — centred on the drawer's scrim, `shadow-float-lg`
 
 They use `.shadow-float` and `.shadow-float-lg`, defined from a per-theme
 `--shadow-float` token. The two themes need genuinely different values: on the
@@ -304,7 +309,7 @@ dark ground a black shadow reads, and on cream the same shadow is invisible, so
 the light theme uses the warm ink at low alpha instead. A shadow calibrated on
 one ground and reused on the other simply disappears.
 
-Adding a fifth shadow means adding it to that list, here, with its reason.
+Adding a sixth shadow means adding it to that list, here, with its reason.
 
 Two corner radii, and the step between them carries meaning: `rounded-md` (8px)
 is a control — a button, an input, an inline panel — and `rounded-lg` (12px) is
@@ -323,6 +328,8 @@ background. The accent now carries them:
 - comment-count badges in the file tree
 - the selected row in the file tree, and the navigation flash, both as
   `--accent-tint`
+- the current comment in the Comments view: a 2px `--accent` left bar on an
+  `--accent-tint` row, the same pair as the tree's selection
 
 Everything else — the export button, the mode selector, the settings rows — is
 neutral. This is the heaviest accent load in the app, and it is the one the
@@ -368,6 +375,63 @@ because comment cards sit inside the preview and must not inherit its density.
   compact filled` with `shadow-float`), centred on the block's first line, and
   a block's comments render under it as the same cards the code view shows
   under a line.
+
+## Sidebar
+
+The sidebar has two views, **Files** (the tree) and **Comments** (the review's
+comments), and one frame around them:
+
+- **Header** — a single row: the active view's search input (`flex-1`, with a
+  `/` key cap at its right end while empty and unfocused) and a
+  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon` + the comment
+  count. Icons only, so the input keeps most of the width and the header does
+  not grow. Each view keeps its own query.
+- **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the file
+  count (and skipped count in folder mode), Collapse all · Expand all as
+  `LinkButton`s, and a compact `IconButton` with `HelpIcon` at the right end that
+  opens the shortcuts dialog. No collapsed count: it changed on every toggle and
+  said nothing the diff doesn't show.
+
+### The comment navigator card
+
+Read-only: a `RowButton` per comment, grouped under a sticky file header (name
+in `--text`, directory in `--faint`, count). Three rows, all in role tokens:
+
+```
+ ┃ L42 +                     2d ago  ⓖ
+ ┃ const port = Number(env.PORT)
+ ┃ Esto debería venir de config, no
+ ┃ de env directamente…
+```
+
+1. location and metadata, 11px `--muted`: `L42` with a `PlusIcon`/`MinusIcon`
+   at 10px in `--success`/`--danger` for the side, `File` for a file-level
+   comment, `· line gone` in `--faint` italic for an orphan; then `edited` in
+   `--warning`, the relative date in `--faint` (exact date in `title`), and the
+   `OriginIcon` — beside the button, not in it, since a forge link cannot nest
+   in a button.
+2. the commented line in the code face, 11px `--faint`, one line truncated —
+   it *is* the code under review, so mono is right. Omitted when the line is
+   not in the view.
+3. the body as plain text (markdown stripped, no renderer in the list), 12px
+   `--text`, clamped to four lines. Search matches are `<mark>` on
+   `--accent-tint`.
+
+The current card carries the accent bar described under the accent. A comment
+reached from the list flashes like a file section does, fading from an accent
+mix back to `--panel`, its own fill.
+
+A file-level or orphaned comment reached with `n`/`p` has no card on screen
+(it lives in the drawer), so besides the section flash the header's file
+comment badge pulses: an `--accent` ring expanding to transparent, three times
+at 700ms. Under reduced motion it is a static 2px accent outline instead.
+
+### Key caps
+
+`.key-cap` in `index.css`: a `bg-track` well, 16px tall, 10px UI face in
+`--muted`, `rounded`. It names a key; it is not code, so it is not mono. Used by
+the search hint, the shortcuts dialog and the comment form's submit hint. `Mod`
+renders as `⌘` on macOS and `Ctrl` elsewhere.
 
 ## Motion
 

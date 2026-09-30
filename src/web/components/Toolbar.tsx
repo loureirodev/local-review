@@ -1,4 +1,4 @@
-import type { LaunchSource } from "@shared/types.js";
+import type { LaunchSource } from "@shared/types";
 import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import { Button, IconButton, SegmentedControl } from "./Button";

@@ -1,17 +1,20 @@
 import type { ReactNode } from "react";
-import { IS_MAC } from "../utils/platform";
+import { keyLabel } from "../shortcuts/registry";
 import { Button } from "./Button";
 
 /** The box a comment is read, edited and written in, so its layout never shifts
  *  between them. A footer appears only while writing. */
 export function CommentCard({
   className = "",
+  commentId,
   writing,
   header,
   footer,
   children,
 }: {
   className?: string;
+  /** Stamped as `data-comment-id`, so navigation can find and flash the card. */
+  commentId?: string;
   /** Accents the border while the editor inside has focus. */
   writing: boolean;
   header: ReactNode;
@@ -20,6 +23,7 @@ export function CommentCard({
 }) {
   return (
     <div
+      data-comment-id={commentId}
       className={`bg-panel border border-hair rounded-md overflow-hidden transition-colors ${
         writing ? "focus-within:border-accent" : ""
       } ${className}`}
@@ -46,9 +50,9 @@ export function CommentFormFooter({
   return (
     <div className="flex items-center justify-between px-2.5 pb-1.5">
       <span className="text-[11px] text-faint">
-        <kbd className="px-1 py-px bg-track rounded text-[10px]">{IS_MAC ? "⌘" : "Ctrl"}</kbd>
+        <kbd className="key-cap">{keyLabel("Mod")}</kbd>
         {" + "}
-        <kbd className="px-1 py-px bg-track rounded text-[10px]">Enter</kbd>
+        <kbd className="key-cap">Enter</kbd>
       </span>
       <div className="flex gap-1.5">
         <Button onClick={onCancel}>Cancel</Button>

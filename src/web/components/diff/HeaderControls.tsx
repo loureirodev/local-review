@@ -135,6 +135,7 @@ export function FileCommentBadge({ count, onClick }: { count: number; onClick: (
   const label =
     count > 0 ? `${count} file-level comment${count !== 1 ? "s" : ""}` : "Add file comment";
 
+  // `data-file-comment-badge` lets the navigation flash pulse it (DiffViewer).
   // With no comments this is a bare add action (a filled icon button, findable
   // without hovering); with a count it becomes a labelled, accented button.
   if (count === 0) {
@@ -142,6 +143,7 @@ export function FileCommentBadge({ count, onClick }: { count: number; onClick: (
       <IconButton
         compact
         filled
+        data-file-comment-badge=""
         onClick={(e) => {
           e.stopPropagation();
           onClick();
@@ -157,6 +159,7 @@ export function FileCommentBadge({ count, onClick }: { count: number; onClick: (
   return (
     <Button
       variant="primary"
+      data-file-comment-badge=""
       onClick={(e) => {
         e.stopPropagation();
         onClick();

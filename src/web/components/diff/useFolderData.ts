@@ -1,9 +1,10 @@
 import type { LineAnnotation } from "@pierre/diffs/react";
-import type { FileReviewState, ReviewComment } from "@shared/types.js";
+import type { FileReviewState, ReviewComment } from "@shared/types";
 import { useMemo } from "react";
 import {
   type CommentAnnotation,
   type FolderFileState,
+  lineCount,
   splitComments,
   type ViewerEntry,
 } from "./diffParsing";
@@ -12,15 +13,6 @@ export interface FolderData {
   entries: ViewerEntry[];
   lineAnnotationsByFile: Map<string, LineAnnotation<CommentAnnotation>[]>;
   fileLevelCommentsByFile: Map<string, ReviewComment[]>;
-}
-
-/** Lines in `content`, without allocating them; a trailing newline ends the
- *  last line rather than starting another. */
-function lineCount(content: string): number {
-  if (content === "") return 0;
-  let lines = 1;
-  for (let i = content.indexOf("\n"); i !== -1; i = content.indexOf("\n", i + 1)) lines++;
-  return content.endsWith("\n") ? lines - 1 : lines;
 }
 
 /** Folder-mode counterpart of `useDiffData`: one `file` entry per path, and

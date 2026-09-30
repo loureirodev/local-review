@@ -1,5 +1,5 @@
 import type { DiffLineAnnotation, FileDiffMetadata, LineAnnotation } from "@pierre/diffs/react";
-import type { FileReviewState, ReviewComment } from "@shared/types.js";
+import type { FileReviewState, ReviewComment } from "@shared/types";
 
 export interface CommentAnnotation {
   comments: ReviewComment[];
@@ -23,6 +23,32 @@ export type ViewerEntry =
 
 export function entryName(entry: ViewerEntry): string {
   return entry.type === "diff" ? entry.fileDiff.name : entry.name;
+}
+
+export type DiffSide = "additions" | "deletions";
+
+/** A comment's side as the diff library names it; a side-less comment is on
+ *  the new file. */
+export function toDiffSide(side: ReviewComment["side"]): DiffSide {
+  return side === "deletion" ? "deletions" : "additions";
+}
+
+/** Lines in `content`, without allocating them; a trailing newline ends the
+ *  last line rather than starting another. */
+export function lineCount(content: string): number {
+  if (content === "") return 0;
+  let lines = 1;
+  for (let i = content.indexOf("\n"); i !== -1; i = content.indexOf("\n", i + 1)) lines++;
+  return content.endsWith("\n") ? lines - 1 : lines;
+}
+
+/** The text of `line` (1-based, at most `lineCount(content)`), without its
+ *  line ending. */
+export function contentLine(content: string, line: number): string {
+  let start = 0;
+  for (let i = 1; i < line; i++) start = content.indexOf("\n", start) + 1;
+  const end = content.indexOf("\n", start);
+  return content.slice(start, end === -1 ? undefined : end).replace(/\r$/, "");
 }
 
 export const EMPTY_ANNOTATIONS: CommentLineAnnotation[] = [];
@@ -85,4 +111,42 @@ export function getVisibleLines(fileDiff: FileDiffMetadata): {
   }
 
   return { additions, deletions };
+}
+
+/** The text of `line` on `side` of a parsed file diff, without its line ending;
+ *  null when the line is not part of the diff's hunks. */
+export function getLineText(
+  fileDiff: FileDiffMetadata,
+  side: DiffSide,
+  line: number,
+): string | null {
+  const lines = side === "additions" ? fileDiff.additionLines : fileDiff.deletionLines;
+  for (const hunk of fileDiff.hunks) {
+    let addLine = hunk.additionStart;
+    let delLine = hunk.deletionStart;
+    for (const content of hunk.hunkContent) {
+      const start = side === "additions" ? addLine : delLine;
+      const count =
+        content.type === "context"
+          ? content.lines
+          : side === "additions"
+            ? content.additions
+            : content.deletions;
+      if (line >= start && line < start + count) {
+        const index =
+          (side === "additions" ? content.additionLineIndex : content.deletionLineIndex) +
+          (line - start);
+        const text = lines[index];
+        return text === undefined ? null : text.replace(/\r?\n$/, "");
+      }
+      if (content.type === "context") {
+        addLine += content.lines;
+        delLine += content.lines;
+      } else {
+        addLine += content.additions;
+        delLine += content.deletions;
+      }
+    }
+  }
+  return null;
 }

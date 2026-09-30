@@ -1,4 +1,4 @@
-import type { ReviewComment } from "@shared/types.js";
+import type { ReviewComment } from "@shared/types";
 import { type ReactNode, useCallback, useState } from "react";
 import { CommentCard, CommentFormFooter } from "./CommentCard";
 import { MarkdownEditor } from "./markdown/MarkdownEditor";

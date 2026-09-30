@@ -5,7 +5,7 @@ import {
   FONT_SIZE_MIN,
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
-} from "@shared/types.js";
+} from "@shared/types";
 import {
   createContext,
   createElement,

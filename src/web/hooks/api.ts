@@ -7,7 +7,7 @@ import type {
   ReviewState,
   SessionResponse,
   SettingsResponse,
-} from "@shared/types.js";
+} from "@shared/types";
 
 const BASE = "";
 

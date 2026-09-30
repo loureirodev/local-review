@@ -1,12 +1,22 @@
-import { parsePatchFiles } from "@pierre/diffs";
-import type { FolderTreeResponse, LaunchSource, ReviewState } from "@shared/types.js";
+import { type FileDiffMetadata, parsePatchFiles } from "@pierre/diffs";
+import type { FolderTreeResponse, LaunchSource, ReviewState } from "@shared/types";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "./components/Button";
-import DiffViewer, { type ViewerContent } from "./components/DiffViewer";
+import CommentsList from "./components/comments/CommentsList";
+import {
+  type CommentIndexSource,
+  type IndexedComment,
+  stepComment,
+  useCommentIndex,
+} from "./components/comments/useCommentIndex";
+import DiffViewer, { type NavigationTarget, type ViewerContent } from "./components/DiffViewer";
 import type { FolderFileState } from "./components/diff/diffParsing";
 import ErrorBoundary from "./components/ErrorBoundary";
 import FileTree, { type FileInfo } from "./components/FileTree";
 import Layout from "./components/Layout";
+import ShortcutsDialog from "./components/ShortcutsDialog";
+import SidebarFooter from "./components/sidebar/SidebarFooter";
+import SidebarHeader, { type SidebarView } from "./components/sidebar/SidebarHeader";
 import Toolbar from "./components/Toolbar";
 import { CollapseProvider } from "./context/CollapseContext";
 import { ReviewProvider, useReview } from "./context/ReviewContext";
@@ -20,6 +30,7 @@ import {
   submitReview,
 } from "./hooks/api";
 import { SettingsProvider } from "./hooks/useSettings";
+import { useGlobalShortcuts } from "./shortcuts/useGlobalShortcuts";
 import { createLoadQueue, type LoadOutcome } from "./utils/loadQueue";
 import { compareByTreeOrder } from "./utils/treeOrder";
 
@@ -29,6 +40,7 @@ type ViewState =
   | ({ kind: "folder" } & FolderTreeResponse);
 
 const EMPTY_FILES: FileInfo[] = [];
+const EMPTY_FILE_DIFFS: FileDiffMetadata[] = [];
 
 /** Fixed once the app has loaded. */
 interface Session {
@@ -100,8 +112,15 @@ function AppContent() {
   // quickly must not leave an older response on screen.
   const loadIdRef = useRef(0);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [navigationTargetFile, setNavigationTargetFile] = useState<string | null>(null);
+  const [navigationTarget, setNavigationTarget] = useState<NavigationTarget | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Files on every load: the view is not persisted.
+  const [sidebarView, setSidebarView] = useState<SidebarView>("files");
+  const [fileQuery, setFileQuery] = useState("");
+  const [commentQuery, setCommentQuery] = useState("");
+  const [currentCommentId, setCurrentCommentId] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [async, dispatchAsync] = useReducer(asyncReducer, {
     loading: true,
     error: null,
@@ -110,18 +129,16 @@ function AppContent() {
 
   const { state, dispatch, addComment, deleteComment, updateComment } = useReview();
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // A focused control that handled the key (the comment editor's bold) wins.
-      if (e.defaultPrevented) return;
-      if ((e.ctrlKey || e.metaKey) && e.key === "b") {
-        e.preventDefault();
-        setSidebarCollapsed((c) => !c);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  const fileDiffs = useMemo(() => {
+    if (view?.kind !== "diff" || !view.patch) return EMPTY_FILE_DIFFS;
+    try {
+      return parsePatchFiles(view.patch)
+        .flatMap((p) => p.files)
+        .sort((a, b) => compareByTreeOrder(a.name, b.name));
+    } catch {
+      return EMPTY_FILE_DIFFS;
+    }
+  }, [view]);
 
   const files: FileInfo[] = useMemo(() => {
     if (view?.kind === "folder") {
@@ -129,12 +146,9 @@ function AppContent() {
         .map((name) => ({ name }))
         .sort((a, b) => compareByTreeOrder(a.name, b.name));
     }
-    if (!view?.patch) return EMPTY_FILES;
-    try {
-      const parsed = parsePatchFiles(view.patch);
-      const allFiles = parsed.flatMap((p) => p.files);
-      return allFiles
-        .map((f) => ({
+    return fileDiffs.length === 0
+      ? EMPTY_FILES
+      : fileDiffs.map((f) => ({
           name: f.name,
           type:
             f.type === "rename-pure" || f.type === "rename-changed"
@@ -142,12 +156,17 @@ function AppContent() {
                 ? ("renamed" as const)
                 : ("renamed-changed" as const)
               : (f.type as FileInfo["type"]),
-        }))
-        .sort((a, b) => compareByTreeOrder(a.name, b.name));
-    } catch {
-      return EMPTY_FILES;
-    }
-  }, [view]);
+        }));
+  }, [view, fileDiffs]);
+
+  const commentSource = useMemo<CommentIndexSource>(
+    () =>
+      view?.kind === "folder"
+        ? { kind: "folder", files: folderFiles }
+        : { kind: "diff", fileDiffs: new Map(fileDiffs.map((f) => [f.name, f])) },
+    [view, fileDiffs, folderFiles],
+  );
+  const comments = useCommentIndex(state.files, commentSource, commentQuery);
 
   const reviewedCount = useMemo(
     () => Object.values(state.files).filter((f) => f.viewed).length,
@@ -269,20 +288,69 @@ function AppContent() {
     () =>
       view?.kind === "folder"
         ? { kind: "folder", paths: filePaths, files: folderFiles, onLoadFile: handleLoadFile }
-        : { kind: "diff", patch: view?.patch ?? "" },
-    [view, filePaths, folderFiles, handleLoadFile],
+        : { kind: "diff", fileDiffs },
+    [view, filePaths, folderFiles, handleLoadFile, fileDiffs],
   );
 
   const handleSelectFile = useCallback((filePath: string) => {
     setSelectedFile(filePath);
-    setNavigationTargetFile(filePath);
+    setNavigationTarget({ file: filePath });
   }, []);
 
-  const handleNavigationHandled = useCallback((filePath: string) => {
-    setNavigationTargetFile((current) => (current === filePath ? null : current));
+  const handleNavigationHandled = useCallback((target: NavigationTarget) => {
+    setNavigationTarget((current) => (current === target ? null : current));
   }, []);
+
+  /** A click opens a file-level or orphaned comment in the file's drawer; `n`/`p`
+   *  only scroll to the file, so stepping through never stops on a dialog. */
+  const navigateToComment = useCallback((entry: IndexedComment, openDrawer: boolean) => {
+    const { comment, kind } = entry;
+    setCurrentCommentId(comment.id);
+    setSelectedFile(comment.filePath);
+    setNavigationTarget(
+      kind === "line" && comment.line !== null
+        ? {
+            file: comment.filePath,
+            comment: { id: comment.id, line: comment.line, side: comment.side },
+          }
+        : { file: comment.filePath, openDrawer, fileComment: true },
+    );
+  }, []);
+
+  const handleSelectComment = useCallback(
+    (entry: IndexedComment) => navigateToComment(entry, true),
+    [navigateToComment],
+  );
+
+  const handleQueryChange = useCallback(
+    (query: string) => (sidebarView === "files" ? setFileQuery(query) : setCommentQuery(query)),
+    [sidebarView],
+  );
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
+
+  const openHelp = useCallback(() => setHelpOpen(true), []);
+
+  useGlobalShortcuts({
+    toggleSidebar,
+    help: openHelp,
+    focusSearch: () => {
+      setSidebarCollapsed(false);
+      // Once the sidebar is visible again: a hidden input can't take focus.
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      });
+    },
+    nextComment: () => {
+      const next = stepComment(comments.all, comments.visible, currentCommentId, 1);
+      if (next) navigateToComment(next, false);
+    },
+    prevComment: () => {
+      const prev = stepComment(comments.all, comments.visible, currentCommentId, -1);
+      if (prev) navigateToComment(prev, false);
+    },
+  });
 
   if (async.error) {
     return (
@@ -335,20 +403,54 @@ function AppContent() {
           />
         }
         sidebar={
-          <FileTree
-            files={files}
-            reviewFiles={state.files}
-            selectedFile={selectedFile}
-            onSelectFile={handleSelectFile}
-            skipped={view.kind === "folder" ? view.skipped : undefined}
-          />
+          <div className="flex flex-col h-full">
+            <SidebarHeader
+              view={sidebarView}
+              onViewChange={setSidebarView}
+              query={sidebarView === "files" ? fileQuery : commentQuery}
+              onQueryChange={handleQueryChange}
+              commentCount={comments.all.length}
+              inputRef={searchInputRef}
+            />
+            {/* Both views stay mounted, so each keeps its scroll and the tree
+                its expansion. */}
+            <div
+              className={`flex-1 min-h-0 flex-col ${sidebarView === "files" ? "flex" : "hidden"}`}
+            >
+              <FileTree
+                files={files}
+                reviewFiles={state.files}
+                selectedFile={selectedFile}
+                onSelectFile={handleSelectFile}
+                search={fileQuery}
+              />
+            </div>
+            <div
+              className={`flex-1 min-h-0 flex-col ${sidebarView === "comments" ? "flex" : "hidden"}`}
+            >
+              <CommentsList
+                comments={comments.visible}
+                total={comments.all.length}
+                query={commentQuery}
+                source={state.source}
+                currentCommentId={currentCommentId}
+                hidden={sidebarView !== "comments"}
+                onSelectComment={handleSelectComment}
+                onSelectFile={handleSelectFile}
+              />
+            </div>
+            <SidebarFooter
+              skipped={view.kind === "folder" ? view.skipped : undefined}
+              onOpenHelp={openHelp}
+            />
+          </div>
         }
       >
         <ErrorBoundary>
           <DiffViewer
             content={viewerContent}
             diffKey={view.kind === "diff" ? `${staged}:${view.branch}` : "folder"}
-            navigationTargetFile={navigationTargetFile}
+            navigationTarget={navigationTarget}
             reviewFiles={state.files}
             onNavigationHandled={handleNavigationHandled}
             onAddComment={addComment}
@@ -357,6 +459,7 @@ function AppContent() {
           />
         </ErrorBoundary>
       </Layout>
+      <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </CollapseProvider>
   );
 }

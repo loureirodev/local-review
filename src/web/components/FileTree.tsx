@@ -1,21 +1,15 @@
 import type { GitStatusEntry } from "@pierre/trees";
 import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react";
-import {
-  type FileReviewState,
-  FOLDER_FILE_MAX_MB,
-  type FolderTreeResponse,
-} from "@shared/types.js";
+import type { FileReviewState } from "@shared/types";
 import { useEffect, useMemo, useRef } from "react";
-import { useCollapse } from "../context/CollapseContext";
-import { LinkButton } from "./Button";
 
 interface FileTreeProps {
   files: FileInfo[];
   reviewFiles: Record<string, FileReviewState>;
   selectedFile: string | null;
   onSelectFile: (filePath: string) => void;
-  /** Folder mode: files left out of the listing, reported in the footer. */
-  skipped?: FolderTreeResponse["skipped"];
+  /** The path filter, typed in the sidebar header. */
+  search: string;
 }
 
 export interface FileInfo {
@@ -98,37 +92,12 @@ const UNSAFE_CSS = `
   }
 `;
 
-function CollapseFooter({ skipped }: { skipped?: FileTreeProps["skipped"] }) {
-  const { totalFiles, collapsedCount, setAllCollapsed } = useCollapse();
-  const skippedCount = (skipped?.binary ?? 0) + (skipped?.oversized ?? 0);
-  if (totalFiles === 0 && skippedCount === 0) return null;
-  const skippedTitle = skipped
-    ? `Not listed: ${skipped.binary} binary, ${skipped.oversized} over ${FOLDER_FILE_MAX_MB} MB`
-    : undefined;
-  return (
-    <div className="flex items-center gap-2 px-2 py-1.5 border-t border-hair bg-panel text-[11px] text-muted">
-      <span className="flex-1 truncate" title={skippedTitle}>
-        {totalFiles} file{totalFiles !== 1 ? "s" : ""}
-        {collapsedCount > 0 && ` · ${collapsedCount} collapsed`}
-        {skippedCount > 0 && ` · ${skippedCount} skipped`}
-      </span>
-      <LinkButton onClick={() => setAllCollapsed(true)} title="Collapse all files">
-        Collapse all
-      </LinkButton>
-      <span className="text-faint">·</span>
-      <LinkButton onClick={() => setAllCollapsed(false)} title="Expand all files">
-        Expand all
-      </LinkButton>
-    </div>
-  );
-}
-
 export default function FileTree({
   files,
   reviewFiles,
   selectedFile,
   onSelectFile,
-  skipped,
+  search,
 }: FileTreeProps) {
   const reviewFilesRef = useRef(reviewFiles);
   reviewFilesRef.current = reviewFiles;
@@ -246,26 +215,9 @@ export default function FileTree({
     }
   }, [selectedPaths, onSelectFile, filePathSet]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    model.setSearch(e.target.value || null);
-  };
+  useEffect(() => {
+    model.setSearch(search || null);
+  }, [search, model]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="p-2 border-b border-hair">
-        <input
-          type="text"
-          placeholder="Filter files..."
-          onChange={handleSearchChange}
-          className="w-full px-2 py-1 text-[13px] bg-panel border border-hair rounded-md focus:outline-none focus:border-accent text-text placeholder-faint transition-colors"
-        />
-      </div>
-
-      {/* Tree */}
-      <PierreFileTree model={model} style={TREE_STYLE_BASE} />
-
-      <CollapseFooter skipped={skipped} />
-    </div>
-  );
+  return <PierreFileTree model={model} style={TREE_STYLE_BASE} />;
 }
