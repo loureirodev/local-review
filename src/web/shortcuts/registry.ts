@@ -37,7 +37,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
     keys: ["Mod", "B"],
     description: "Toggle sidebar",
     group: "Navigation",
-    match: (e) => (e.ctrlKey || e.metaKey) && !e.altKey && e.key === "b",
+    match: (e) =>
+      (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "b",
     plain: false,
   },
   {

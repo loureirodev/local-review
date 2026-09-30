@@ -35,7 +35,7 @@ function groupByFile(comments: IndexedComment[]): FileGroup[] {
 
 function EmptyState({ title, hint }: { title: string; hint: string }) {
   return (
-    <div className="px-4 py-8 text-center">
+    <div role="status" className="px-4 py-8 text-center">
       <p className="text-[13px] text-muted">{title}</p>
       <p className="text-[11px] text-faint mt-1">{hint}</p>
     </div>
