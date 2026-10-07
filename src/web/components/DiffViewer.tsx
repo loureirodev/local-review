@@ -11,6 +11,7 @@ import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState
 import { useCollapse } from "../context/CollapseContext";
 import { useReview } from "../context/ReviewContext";
 import { useMountEffect } from "../hooks/useMountEffect";
+import { useNarrowScreen } from "../hooks/useNarrowScreen";
 import { useSettings } from "../hooks/useSettings";
 import { useTheme } from "../hooks/useTheme";
 import CommentDisplay from "./CommentDisplay";
@@ -122,8 +123,11 @@ function DiffViewerInner({
   onUpdateComment,
 }: DiffViewerProps) {
   const {
-    state: { diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight },
+    state: { diffStyle: preferredDiffStyle, wrapLines, showLineNumbers, fontSize, lineHeight },
   } = useSettings();
+  // Two code columns do not fit a phone: there the layout is locked to
+  // unified, shadowing the stored preference without overwriting it.
+  const diffStyle = useNarrowScreen() ? "unified" : preferredDiffStyle;
   const {
     state: { source },
     toggleViewed,

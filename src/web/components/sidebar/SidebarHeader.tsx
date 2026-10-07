@@ -46,7 +46,7 @@ export default function SidebarHeader({
             onQueryChange("");
             e.currentTarget.blur();
           }}
-          className="peer w-full pl-2 pr-6 py-1 text-[13px] bg-panel border border-hair rounded-md focus:outline-none focus:border-accent text-text placeholder-faint transition-colors"
+          className="peer w-full pl-2 pr-6 py-1 text-[13px] bg-panel border border-hair rounded-md text-text placeholder-faint transition-colors"
         />
         {/* Hidden while typing: it would sit on the text. */}
         {query ? null : (

@@ -1,5 +1,6 @@
 // Git operations using Bun.spawn
 
+import { basename, dirname } from "node:path";
 import type { DiffSource } from "../shared/types";
 
 /** Run a shell command and return its stdout. */
@@ -45,13 +46,24 @@ export async function getRepoRoot(cwd?: string): Promise<string> {
   return run(["git", "rev-parse", "--show-toplevel"], cwd);
 }
 
-/** Get current branch name. */
-export async function getCurrentBranch(cwd?: string): Promise<string> {
+/** Repository name from its common git dir: `/x/repo/.git` → `repo`,
+ *  `/x/repo.git` (bare) → `repo`. */
+export function repoNameFromCommonDir(commonDir: string): string {
+  const last = basename(commonDir);
+  return last === ".git" ? basename(dirname(commonDir)) : basename(last, ".git");
+}
+
+/** Name of the main repository, the same from any of its worktrees; undefined
+ *  outside a repository. */
+export async function getRepoName(cwd?: string): Promise<string | undefined> {
   try {
-    return await run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    const commonDir = await run(
+      ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      cwd,
+    );
+    return repoNameFromCommonDir(commonDir) || undefined;
   } catch {
-    // No commits yet
-    return "(no commits)";
+    return undefined;
   }
 }
 

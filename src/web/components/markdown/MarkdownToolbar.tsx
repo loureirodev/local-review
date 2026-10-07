@@ -223,7 +223,7 @@ function LinkField({ onDone }: { onDone: (url: string | null) => void }) {
       placeholder="https://… then Enter"
       aria-label="Link URL"
       aria-invalid={url !== "" && !valid}
-      className="h-6 w-52 px-1.5 text-[11px] bg-bg border border-hair rounded-md text-text placeholder-faint focus:outline-none focus:border-accent aria-invalid:border-danger transition-colors"
+      className="h-6 w-52 px-1.5 text-[11px] bg-bg border border-hair rounded-md text-text placeholder-faint aria-invalid:border-danger aria-invalid:outline-danger transition-colors"
     />
   );
 }

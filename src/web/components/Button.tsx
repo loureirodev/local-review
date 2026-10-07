@@ -2,9 +2,9 @@
    and hover stay identical across call sites. A raw `<button>` outside this file
    is a bug. See DESIGN.md. */
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { type ComponentPropsWithRef, type ReactNode, useId } from "react";
 
-type NativeButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className">;
+type NativeButtonProps = Omit<ComponentPropsWithRef<"button">, "className">;
 
 /** `neutral` is the default. `primary` is reserved for the one action a surface
  *  exists to perform; `success` is the on-state of a completion toggle. */
@@ -67,9 +67,9 @@ export function IconButton({
   );
 }
 
-/** A row of mutually exclusive options (diff mode, diff layout). The selected
- *  one lifts to the page ground inside a `bg-track` well. An option whose label
- *  is only an icon takes a `title`, which is also its accessible name. */
+/** A row of mutually exclusive options (diff mode, diff layout), as native
+ *  radios so arrow keys move the selection; the sliding pill is `.segmented`
+ *  in index.css. An icon-only option takes a `title` as its accessible name. */
 export function SegmentedControl<T extends string>({
   value,
   options,
@@ -81,37 +81,48 @@ export function SegmentedControl<T extends string>({
   onChange: (value: T) => void;
   "aria-label": string;
 }) {
+  const name = useId();
   return (
     <fieldset
-      className="flex items-center gap-px p-0.5 bg-track rounded-md border-0 m-0 min-w-0"
+      className="segmented flex items-center gap-px p-0.5 bg-track rounded-md border-0 m-0 min-w-0"
       aria-label={ariaLabel}
     >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          aria-pressed={option.value === value}
-          title={option.title}
-          aria-label={option.title}
-          className={`flex items-center justify-center gap-1.5 flex-1 px-2.5 py-1 text-xs font-medium rounded-[5px] transition-colors ${
-            option.value === value ? "bg-bg text-text" : "text-muted hover:text-text"
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
+      {options.map((option) => {
+        const checked = option.value === value;
+        return (
+          <label
+            key={option.value}
+            title={option.title}
+            data-checked={checked}
+            className={`flex items-center justify-center gap-1.5 flex-1 px-2.5 py-1 text-xs font-medium rounded-[5px] cursor-pointer transition-colors duration-[280ms] ${
+              checked ? "bg-bg text-text" : "text-muted hover:text-text"
+            }`}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={checked}
+              onChange={() => onChange(option.value)}
+              aria-label={option.title}
+              className="sr-only"
+            />
+            {option.label}
+          </label>
+        );
+      })}
     </fieldset>
   );
 }
 
 /** Text-only, for a button set inside a line of metadata ("Collapse all"): it
- *  takes no shape because its row already has one. */
+ *  takes no shape because its row already has one. Padding offset by negative
+ *  margin leaves room for the inset focus ring. */
 export function LinkButton({ children, ...props }: NativeButtonProps & { children: ReactNode }) {
   return (
     <button
       type="button"
-      className="text-muted hover:text-text transition-colors disabled:opacity-40"
+      className="px-1 -mx-1 py-0.5 -my-0.5 rounded text-muted hover:text-text transition-colors disabled:opacity-40"
       {...props}
     >
       {children}
@@ -158,7 +169,7 @@ export function RowButton({
   return (
     <button
       type="button"
-      className={`w-full text-left transition-colors hover:bg-track focus-visible:outline-none focus-visible:bg-track ${className}`}
+      className={`w-full text-left transition-colors hover:bg-track focus-visible:bg-track ${className}`}
       {...props}
     >
       {children}

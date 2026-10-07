@@ -57,6 +57,7 @@ export interface ReviewState {
 // ===== API Types =====
 
 interface RepoInfo {
+  /** Checked-out branch, or the short SHA on a detached `HEAD`. */
   branch: string;
   repoRoot: string;
 }
@@ -71,6 +72,9 @@ export interface DiffResponse {
  *  endpoints the UI calls. */
 export interface SessionResponse {
   source: LaunchSource;
+  /** Main repository's name, shared by all its worktrees. Absent outside a
+   *  repository (folder mode only). */
+  repo?: string;
 }
 
 /** Folder mode's per-file cap: larger files are left out of the listing. */

@@ -37,6 +37,10 @@ const TREE_STYLE_BASE = {
   "--trees-theme-list-hover-bg": "var(--color-track)",
   "--trees-selected-bg-override": "var(--color-accent-tint)",
   "--trees-selected-fg-override": "var(--color-text)",
+  "--trees-focus-ring-color-override": "var(--color-accent)",
+  "--trees-selected-focused-border-color-override": "var(--color-accent)",
+  "--trees-focus-ring-width-override": "var(--focus-ring-width)",
+  "--trees-focus-ring-offset-override": "calc(var(--focus-ring-width) * -1)",
   "--trees-status-untracked-override": "var(--color-success)",
   "--trees-status-added-override": "var(--color-success)",
   "--trees-status-deleted-override": "var(--color-danger)",
@@ -55,6 +59,21 @@ const UNSAFE_CSS = `
        follow the OS and ignore data-theme. Inheriting picks up :root's resolved
        scheme instead. */
     color-scheme: inherit;
+  }
+
+  /* The ring is a ::before created on focus: @starting-style gives the fade a
+     start colour. */
+  [data-item-focused="true"]::before,
+  :focus-visible::before {
+    transition: outline-color var(--default-transition-duration)
+      var(--default-transition-timing-function);
+  }
+
+  @starting-style {
+    [data-item-focused="true"]::before,
+    :focus-visible::before {
+      outline-color: transparent;
+    }
   }
 
   /* --trees-bg is transparent here (see TREE_STYLE_BASE), so the truncation
@@ -105,6 +124,7 @@ export default function FileTree({
   const { model } = useFileTree({
     paths: files.map((f) => f.name),
     initialExpansion: "open",
+    density: "compact",
     unsafeCSS: UNSAFE_CSS,
     renderRowDecoration: ({ item }) => {
       if (item.kind !== "file") return null;
