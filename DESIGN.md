@@ -87,9 +87,9 @@ house outline in ink, not the colours. The source files are
 
 Where it appears:
 
-- **Toolbar, far left:** `LogoMark` at `ICON_SIZE`, outline variant, ink
-  outline, followed by the wordmark `local-review` (Lexend 13px semibold,
-  tight tracking, ink) from the `md` breakpoint up. Below `md` the mark stands
+- **Toolbar, far left:** `LogoMark` at 26px, outline variant, ink
+  outline, followed by the wordmark `local-review` (Lexend `text-sm` semibold,
+  tight tracking, ink; `review` in `text-accent`) from the `md` breakpoint up. Below `md` the mark stands
   alone and the name is `sr-only`.
 - **Favicon:** `src/web/public/favicon.svg`, solid variant (a filled house
   survives 16px; a 4.4/64 outline does not). `currentColor` means nothing in a
@@ -237,6 +237,12 @@ hidden under the selected one so it enters from there. No measuring, so an
 option whose width changes (the comment count) carries its pill with it. Where
 anchor positioning or `anchor-scope` is missing, the checked label keeps its own
 `bg-bg` and nothing slides.
+
+The pill's corner is the well's `rounded-md` minus the well's `p-0.5`
+(`--segmented-pill-radius`), so the two curves stay concentric; and options
+stretch to the well's full height, so an icon-only option's pill is as tall as
+its text neighbour's. The `.toggle-switch` knob is centred the same way: track,
+padding, knob and travel all come from the spacing scale.
 
 Its focus ring (see [Focus](#focus)) is drawn as an inset `box-shadow` on the
 selected pill, so it slides with it (a radio's focus is its selection), or as
@@ -482,12 +488,13 @@ comments), and one frame around them:
 
 - **Header** — a single row: the active view's search input (`flex-1`, with a
   `/` key cap at its right end while empty and unfocused) and a
-  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon` + the comment
-  count. Icons only, so the input keeps most of the width and the header does
-  not grow. Each view keeps its own query.
-- **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the file
-  count (and skipped count in folder mode), Collapse all · Expand all as
-  `LinkButton`s, and a compact `IconButton` with `HelpIcon` at the right end that
+  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon`, with the
+  comment count only in the option's `title`. The bubble is empty with no
+  comments and `written` (two lines of text inside) once there is one. Icons only, so the input keeps
+  most of the width and the header does not grow. Each view keeps its own query.
+- **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the
+  active view's count — files (and skipped, in folder mode) or comments —
+  then Collapse all · Expand all as `LinkButton`s, and a compact `IconButton` with `HelpIcon` at the right end that
   opens the shortcuts dialog. No collapsed count: it changed on every toggle and
   said nothing the diff doesn't show.
 

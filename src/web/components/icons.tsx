@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 
 /** 24x24 at 20px is an effective 1.25px stroke, matching `openspec-ui`. */
-export const ICON_SIZE = 20;
+const ICON_SIZE = 20;
 
 /** For icons set inside 11px metadata lines, where 20px would tower over the
  *  text it labels. Same grid and stroke, smaller render. See DESIGN.md. */
@@ -212,10 +212,13 @@ export function ChevronRightIcon({ size, className }: IconProps) {
   );
 }
 
-export function CommentIcon({ size, className }: IconProps) {
+/** `written` adds two lines of text inside the bubble: the same shape, telling
+ *  "there are comments" from "there are none". */
+export function CommentIcon({ size, className, written }: IconProps & { written?: boolean }) {
   return (
     <Icon size={size} className={className}>
       <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4V5z" />
+      {written ? <path d="M7.5 8h9M7.5 12h6" /> : null}
     </Icon>
   );
 }

@@ -158,7 +158,7 @@ function DiffViewerInner({
   // Folder markdown files shown rendered (diffs always show code).
   const { previewable, sourceFiles, setPreview, getPreview } = useMarkdownPreview(entries);
 
-  const codeViewRef = useRef<CodeViewHandle<CommentAnnotation>>(null);
+  const codeViewRef = useRef<CodeViewHandle<CommentAnnotation, undefined>>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
 
   const { filesKey, initialItems, collectUpdatedItems, buildAllItems } = useCodeViewItems({

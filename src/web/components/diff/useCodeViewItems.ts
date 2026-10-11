@@ -55,7 +55,7 @@ function commentSig(comment: ReviewComment): string {
   return `${comment.id}:${comment.edited ? 1 : 0}:${comment.line}:${comment.side}:${hashString(comment.body)}`;
 }
 
-export interface VersionEntry {
+interface VersionEntry {
   sig: string;
   n: number;
 }

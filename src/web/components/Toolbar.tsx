@@ -162,17 +162,18 @@ export default function Toolbar({
   return (
     <header className="flex flex-wrap md:flex-nowrap items-center bg-panel border-b border-hair flex-shrink-0 z-20">
       {/* As wide as the sidebar from md up, so what is under review starts where
-          the diff does. */}
-      <div className="flex items-center justify-between gap-0.5 h-10 px-1 shrink-0 md:w-sidebar md:border-r border-hair">
+          the diff does; the width alone marks the column, with or without the
+          sidebar showing, so it needs no rule. */}
+      <div className="flex items-center gap-0.5 md:gap-2 h-10 px-1 shrink-0 md:w-sidebar">
         <div className="flex items-center gap-1.5 px-1.5 text-text shrink-0" title="local-review">
-          <LogoMark />
+          <LogoMark size={26} />
           {/* Wordmark from md up; below that the mark alone, named for screen readers. */}
-          <span className="sr-only md:not-sr-only text-[13px] font-semibold tracking-tight">
-            local-review
+          <span className="sr-only md:not-sr-only text-sm font-semibold tracking-tight">
+            local-<span className="text-accent">review</span>
           </span>
         </div>
 
-        {/* From md up the mark and the toggle are the cell's two ends. */}
+        {/* From md up the wordmark's gap separates them instead. */}
         <Divider className="md:hidden" />
 
         <IconButton

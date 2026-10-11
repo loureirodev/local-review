@@ -67,12 +67,7 @@ export default function SidebarHeader({
           {
             value: "comments",
             title: `Comments (${commentCount})`,
-            label: (
-              <>
-                <CommentIcon size={ICON_SIZE_INLINE} />
-                <span className="tabular-nums">{commentCount}</span>
-              </>
-            ),
+            label: <CommentIcon size={ICON_SIZE_INLINE} written={commentCount > 0} />,
           },
         ]}
       />

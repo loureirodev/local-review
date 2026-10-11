@@ -172,13 +172,14 @@ body {
   box-shadow: var(--shadow-float-lg);
 }
 
-/* Toggle switch */
+/* Toggle switch. Padding, knob and travel share the spacing scale, so the knob
+   stays centred at any root size: w-7 − 2 × p-0.5 − knob 3 = 3 of travel. */
 .toggle-switch {
-  @apply relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border border-track transition-colors duration-150 ease-in-out;
+  @apply inline-flex items-center h-4 w-7 p-0.5 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-150 ease-in-out;
 }
 
 .toggle-switch[data-checked="true"] {
-  @apply bg-accent border-accent;
+  @apply bg-accent;
 }
 
 .toggle-switch[data-checked="false"] {
@@ -187,11 +188,17 @@ body {
 
 .toggle-switch::after {
   content: "";
-  @apply absolute top-[1px] left-[1px] h-2.5 w-2.5 rounded-full bg-panel transition-transform duration-150 ease-in-out;
+  @apply size-3 rounded-full bg-panel transition-transform duration-150 ease-in-out;
 }
 
 .toggle-switch[data-checked="true"]::after {
-  @apply translate-x-[11px] bg-bg;
+  @apply translate-x-3 bg-bg;
+}
+
+/* The pill's corner is the well's minus the well's padding (`p-0.5`), so the
+   two curves stay concentric. */
+.segmented {
+  --segmented-pill-radius: calc(var(--radius-md) - var(--spacing) * 0.5);
 }
 
 /* SegmentedControl's sliding pills, anchored to the selected and hovered
@@ -228,7 +235,7 @@ body {
     position: absolute;
     z-index: -1;
     inset: anchor(top) anchor(right) anchor(bottom) anchor(left);
-    border-radius: 5px;
+    border-radius: var(--segmented-pill-radius);
     transition:
       inset 280ms cubic-bezier(0.22, 1, 0.36, 1),
       opacity 150ms ease-out,

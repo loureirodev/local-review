@@ -254,15 +254,6 @@ function AppContent() {
     () => commentsSignature(Object.values(state.files)) !== exportedComments,
     [state.files, exportedComments],
   );
-  // Until the first load, index.html's title stands.
-  const title =
-    session && view
-      ? pageTitle(session.launch, session.repo, view.kind === "diff" ? view.branch : "", unsaved)
-      : null;
-  useEffect(() => {
-    if (title) document.title = title;
-  }, [title]);
-
   const handleStagedChange = useCallback(
     (nextStaged: boolean) => {
       setStaged(nextStaged);
@@ -413,7 +404,7 @@ function AppContent() {
       <div className="flex items-center justify-center h-screen bg-bg">
         <div className="flex flex-col items-center gap-3">
           <div className="size-6 border-[1.5px] border-hair border-t-accent rounded-full animate-spin" />
-          <p className="text-xs text-muted">Loading diff...</p>
+          <p className="text-xs text-muted">Loading diff…</p>
         </div>
       </div>
     );
@@ -425,6 +416,10 @@ function AppContent() {
       reviewFiles={state.files}
       collapsedByDefault={session.launch.type === "folder"}
     >
+      {/* Rendered before index.html's <title>, which stands until the first load. */}
+      <title>
+        {pageTitle(session.launch, session.repo, view.kind === "diff" ? view.branch : "", unsaved)}
+      </title>
       <Layout
         sidebarCollapsed={sidebarCollapsed}
         onCollapseSidebar={collapseSidebar}
@@ -480,6 +475,8 @@ function AppContent() {
             </div>
             <SidebarFooter
               skipped={view.kind === "folder" ? view.skipped : undefined}
+              view={sidebarView}
+              commentCount={comments.all.length}
               onOpenHelp={openHelp}
             />
           </div>

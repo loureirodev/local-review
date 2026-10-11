@@ -3,16 +3,26 @@ import { useCollapse } from "../../context/CollapseContext";
 import { shortcutLabel } from "../../shortcuts/registry";
 import { IconButton, LinkButton } from "../Button";
 import { HelpIcon, ICON_SIZE_INLINE } from "../icons";
+import type { SidebarView } from "./SidebarHeader";
 
 interface SidebarFooterProps {
   /** Folder mode: files left out of the listing. */
   skipped?: FolderTreeResponse["skipped"];
+  /** Picks the count: files in the Files view, comments in the Comments view. */
+  view: SidebarView;
+  commentCount: number;
   onOpenHelp: () => void;
 }
 
-/** Under both sidebar views: the file count, the viewer's collapse actions and
- *  the shortcuts help. */
-export default function SidebarFooter({ skipped, onOpenHelp }: SidebarFooterProps) {
+/** Under both sidebar views: the active view's count, the viewer's collapse
+ *  actions and the shortcuts help. The comment count lives here so the header's
+ *  Files/Comments switch stays two bare icons. */
+export default function SidebarFooter({
+  skipped,
+  view,
+  commentCount,
+  onOpenHelp,
+}: SidebarFooterProps) {
   const { totalFiles, setAllCollapsed } = useCollapse();
   const skippedCount = (skipped?.binary ?? 0) + (skipped?.oversized ?? 0);
   const skippedTitle = skipped
@@ -21,10 +31,16 @@ export default function SidebarFooter({ skipped, onOpenHelp }: SidebarFooterProp
   const helpLabel = `Keyboard shortcuts (${shortcutLabel("help")})`;
   return (
     <div className="flex items-center gap-2 pl-2 pr-1 py-0.5 border-t border-hair bg-panel text-[11px] text-muted">
-      <span className="flex-1 truncate" title={skippedTitle}>
-        {totalFiles} file{totalFiles !== 1 ? "s" : ""}
-        {skippedCount > 0 && ` · ${skippedCount} skipped`}
-      </span>
+      {view === "comments" ? (
+        <span className="flex-1 truncate">
+          {commentCount} comment{commentCount !== 1 ? "s" : ""}
+        </span>
+      ) : (
+        <span className="flex-1 truncate" title={skippedTitle}>
+          {totalFiles} file{totalFiles !== 1 ? "s" : ""}
+          {skippedCount > 0 && ` · ${skippedCount} skipped`}
+        </span>
+      )}
       {totalFiles > 0 ? (
         <>
           <LinkButton onClick={() => setAllCollapsed(true)} title="Collapse all files">

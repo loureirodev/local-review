@@ -91,7 +91,7 @@ export async function getBaseBranch(cwd?: string): Promise<string> {
 }
 
 /** SHA of `HEAD`, or undefined when the repository has no commits yet. */
-export async function getHeadCommit(cwd?: string): Promise<string | undefined> {
+async function getHeadCommit(cwd?: string): Promise<string | undefined> {
   try {
     return await run(["git", "rev-parse", "HEAD"], cwd);
   } catch {

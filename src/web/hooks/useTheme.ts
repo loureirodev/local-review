@@ -3,9 +3,9 @@ import { useMediaQuery } from "./useMediaQuery";
 import { useSettings } from "./useSettings";
 
 /** What the reviewer asked for. `"system"` defers to the environment. */
-export type ThemeOverride = "light" | "dark" | "system";
+type ThemeOverride = "light" | "dark" | "system";
 /** What actually gets painted, once the override and the environment are resolved. */
-export type ResolvedTheme = "light" | "dark";
+type ResolvedTheme = "light" | "dark";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 

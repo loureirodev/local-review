@@ -84,7 +84,7 @@ export function SegmentedControl<T extends string>({
   const name = useId();
   return (
     <fieldset
-      className="segmented flex items-center gap-px p-0.5 bg-track rounded-md border-0 m-0 min-w-0"
+      className="segmented flex items-stretch gap-px p-0.5 bg-track rounded-md border-0 m-0 min-w-0"
       aria-label={ariaLabel}
     >
       {options.map((option) => {
@@ -94,7 +94,7 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             title={option.title}
             data-checked={checked}
-            className={`flex items-center justify-center gap-1.5 flex-1 px-2.5 py-1 text-xs font-medium rounded-[5px] cursor-pointer transition-colors duration-[280ms] ${
+            className={`flex items-center justify-center gap-1.5 flex-1 px-2.5 py-1 text-xs font-medium rounded-(--segmented-pill-radius) cursor-pointer transition-colors duration-[280ms] ${
               checked ? "bg-bg text-text" : "text-muted hover:text-text"
             }`}
           >
