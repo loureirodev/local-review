@@ -51,7 +51,10 @@ export function ViewedToggle({ viewed, onClick }: { viewed: boolean; onClick: ()
           motion rather than a flicker. */}
       <span
         aria-hidden="true"
-        className={`inline-flex items-center justify-center size-3 shrink-0 rounded-full border transition-[background-color,border-color] duration-300 ${
+        // On a phone the ring is all there is: its margins trade the
+        // button's side padding for height, so it is as square as the compact
+        // icon buttons.
+        className={`inline-flex items-center justify-center size-3 shrink-0 rounded-full border max-sm:-mx-1 max-sm:my-0.5 transition-[background-color,border-color] duration-300 ${
           viewed ? "border-transparent bg-success/28" : "border-current"
         }`}
       >
@@ -62,7 +65,8 @@ export function ViewedToggle({ viewed, onClick }: { viewed: boolean; onClick: ()
           }`}
         />
       </span>
-      Viewed
+      {/* The ring alone on a phone, so the file name keeps the header's room. */}
+      <span className="max-sm:sr-only">Viewed</span>
     </Button>
   );
 }

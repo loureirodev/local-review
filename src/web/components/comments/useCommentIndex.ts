@@ -77,15 +77,26 @@ function indexEntry(comment: ReviewComment, { kind, code }: Placement): IndexedC
   return entry;
 }
 
-/** Every comment of the review, files in tree order, and within a file:
- *  file-level, then orphaned ones, then line comments by line. */
+/** Files in `order` first, in its order; the rest after, in tree order. */
+function compareByOrder(order: readonly string[]): (a: string, b: string) => number {
+  const rank = new Map(order.map((path, i) => [path, i]));
+  return (a, b) => {
+    const ra = rank.get(a) ?? Number.POSITIVE_INFINITY;
+    const rb = rank.get(b) ?? Number.POSITIVE_INFINITY;
+    return ra !== rb ? ra - rb : compareByTreeOrder(a, b);
+  };
+}
+
+/** Every comment, files in `order` (tree order when null); within a file:
+ *  file-level, then orphaned, then line comments by line. */
 export function buildCommentIndex(
   reviewFiles: Record<string, FileReviewState>,
   source: CommentIndexSource,
+  order: readonly string[] | null = null,
 ): IndexedComment[] {
   const paths = Object.keys(reviewFiles)
     .filter((path) => reviewFiles[path].comments.length > 0)
-    .sort(compareByTreeOrder);
+    .sort(order ? compareByOrder(order) : compareByTreeOrder);
   const index: IndexedComment[] = [];
   for (const path of paths) {
     const place = placer(source, path);
@@ -132,13 +143,18 @@ export function stepComment(
   return null;
 }
 
-/** The ordered comment list shared by the sidebar and the `n`/`p` shortcuts. */
+/** The ordered comment list shared by the sidebar and the `n`/`p` shortcuts.
+ *  `order` is the diff's file order: the walkthrough's while one is in use. */
 export function useCommentIndex(
   reviewFiles: Record<string, FileReviewState>,
   source: CommentIndexSource,
   query: string,
+  order: readonly string[] | null,
 ): { all: IndexedComment[]; visible: IndexedComment[] } {
-  const all = useMemo(() => buildCommentIndex(reviewFiles, source), [reviewFiles, source]);
+  const all = useMemo(
+    () => buildCommentIndex(reviewFiles, source, order),
+    [reviewFiles, source, order],
+  );
   const visible = useMemo(() => filterComments(all, query), [all, query]);
   return { all, visible };
 }

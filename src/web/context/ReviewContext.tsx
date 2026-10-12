@@ -1,25 +1,35 @@
-import type { DiffSource, FileReviewState, ReviewComment, ReviewState } from "@shared/types";
+import type {
+  DiffSource,
+  FileReviewState,
+  ReviewComment,
+  ReviewState,
+  ReviewWalkthrough,
+} from "@shared/types";
 import { createContext, type Dispatch, type ReactNode, use, useCallback, useReducer } from "react";
 
 // ===== State =====
 
-interface ReviewStateLocal {
+export interface ReviewStateLocal {
   files: Record<string, FileReviewState>;
   source: DiffSource | null;
+  /** Loaded with the review and written back unchanged on export. */
+  walkthrough: ReviewWalkthrough | null;
 }
 
-const initialState: ReviewStateLocal = {
+export const initialState: ReviewStateLocal = {
   files: {},
   source: null,
+  walkthrough: null,
 };
 
 // ===== Actions =====
 
-type ReviewAction =
+export type ReviewAction =
   | { type: "INIT_FILES"; filePaths: string[] }
   | { type: "SET_SOURCE"; source: DiffSource }
   | { type: "LOAD_REVIEW"; reviewState: ReviewState }
   | { type: "TOGGLE_VIEWED"; filePath: string }
+  | { type: "SET_VIEWED"; paths: string[]; viewed: boolean }
   | { type: "ADD_COMMENT"; comment: ReviewComment }
   | { type: "DELETE_COMMENT"; filePath: string; commentId: string }
   | {
@@ -29,7 +39,7 @@ type ReviewAction =
       body: string;
     };
 
-function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewStateLocal {
+export function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewStateLocal {
   switch (action.type) {
     case "SET_SOURCE":
       return { ...state, source: action.source };
@@ -39,7 +49,12 @@ function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewSta
       for (const file of action.reviewState.files) {
         files[file.path] = file;
       }
-      return { ...state, files, source: action.reviewState.source };
+      return {
+        ...state,
+        files,
+        source: action.reviewState.source,
+        walkthrough: action.reviewState.walkthrough ?? null,
+      };
     }
 
     case "INIT_FILES": {
@@ -64,6 +79,15 @@ function reviewReducer(state: ReviewStateLocal, action: ReviewAction): ReviewSta
           [action.filePath]: { ...file, viewed: !file.viewed },
         },
       };
+    }
+
+    case "SET_VIEWED": {
+      const files = { ...state.files };
+      for (const path of action.paths) {
+        const file = files[path];
+        if (file && file.viewed !== action.viewed) files[path] = { ...file, viewed: action.viewed };
+      }
+      return { ...state, files };
     }
 
     case "ADD_COMMENT": {

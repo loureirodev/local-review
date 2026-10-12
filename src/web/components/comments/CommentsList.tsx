@@ -1,5 +1,6 @@
 import type { DiffSource } from "@shared/types";
 import { useEffect, useMemo, useRef } from "react";
+import { splitPath } from "../../utils/path";
 import { RowButton } from "../Button";
 import CommentNavCard from "./CommentNavCard";
 import type { IndexedComment } from "./useCommentIndex";
@@ -77,9 +78,7 @@ export default function CommentsList({
     content = <EmptyState title="No matching comments" hint="Press Esc to clear the search." />;
   } else {
     content = groups.map(({ filePath, comments: fileComments }) => {
-      const slash = filePath.lastIndexOf("/");
-      const name = filePath.slice(slash + 1);
-      const dir = slash === -1 ? "" : filePath.slice(0, slash);
+      const { name, dir } = splitPath(filePath);
       return (
         <section key={filePath} className="border-b border-hair">
           <RowButton

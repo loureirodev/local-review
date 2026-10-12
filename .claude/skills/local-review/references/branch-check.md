@@ -1,11 +1,17 @@
-# Branch check — before `open --existing` and `apply`
+# Branch check — before `open --existing`, `apply` and `import`
 
 A review's line numbers only mean something on the code it was made against.
 The CLI compares the review with the checkout deterministically; the skill
-only reacts to its result. Never compare branches by reading the XML yourself.
+only reacts to its result.
 
 Run this **before** launching the server (`open --existing`) or editing any
 file (`apply`).
+
+**During an import** there is no review file yet: the source's `head` is the
+expected branch, and `git rev-parse --abbrev-ref HEAD` the current one. Set
+`expected.worktree` from `git worktree list --porcelain` when another worktree
+has `head` checked out. Start at Step 3, and wherever a step says to run
+Step 1 again, compare the branches again instead.
 
 ---
 
@@ -28,9 +34,6 @@ file (or unreadable). `expected.worktree` is set on a `branch-mismatch` when
   "source": { "type": "github-pr", "owner": "…", "repo": "…", "pr": 42, "…": "…" }
 }
 ```
-
-If `local-review` is not installed, tell the user the check needs it
-(`npm install -g @loureirodev/local-review`) and stop.
 
 ## Step 2 — React to the result
 
@@ -66,7 +69,7 @@ Use the AskUserQuestion tool. Options, in this order:
    checkout and its local changes untouched; recommend it when
    `git status --porcelain` is not empty.
 4. **Continue on `<current.branch>`** — `open` launches with `--no-check`;
-   `apply` proceeds.
+   `apply` and `import` proceed.
 5. **Cancel** — stop. Do not launch the server, do not edit files.
 
 ## Step 4 — Switch safely

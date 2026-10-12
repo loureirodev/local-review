@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { DiffSource, ReviewComment, ReviewState } from "../shared/types";
+import type { DiffSource, ReviewComment, ReviewState, ReviewWalkthrough } from "../shared/types";
 import { deserializeReview, isLegacyReview } from "./xml-deserializer";
 import { serializeReview } from "./xml-serializer";
 
@@ -95,5 +95,88 @@ describe("legacy reviews", () => {
     expect(isLegacyReview(xml)).toBe(true);
     expect(deserializeReview(xml).source).toEqual({ type: "pending", staged: false });
     expect(isLegacyReview(serializeReview(review({ type: "pending", staged: true })))).toBe(false);
+  });
+});
+
+const WALKTHROUGH: ReviewWalkthrough = {
+  intent: "Adds a **walkthrough**.\n\n```mermaid\ngraph LR\n  A --> B\n```",
+  risk: { reversible: false, body: "Old app versions drop `<walkthrough>` & save." },
+  steps: [
+    {
+      title: 'Format <walkthrough> & "steps"',
+      verify: "- Escaping of `<` and `&`\n- Order is kept",
+      files: [{ path: "src/a.ts", role: "Parses the <step> & <file> list" }, { path: "src/b.ts" }],
+    },
+    { title: "Lockfile", files: [{ path: "bun.lock" }] },
+  ],
+};
+
+describe("walkthrough", () => {
+  const base = review({ type: "pending", staged: false, head: "feat/x", commit: SHA }, [
+    comment(3, "addition"),
+  ]);
+
+  test("review without walkthrough has no block and reads back without one", () => {
+    const xml = serializeReview(base);
+    expect(xml).not.toContain("<walkthrough>");
+    expect("walkthrough" in deserializeReview(xml)).toBe(false);
+  });
+
+  test("is written between <source> and <files>", () => {
+    const xml = serializeReview({ ...base, walkthrough: WALKTHROUGH });
+    const source = xml.indexOf("<source ");
+    const walkthrough = xml.indexOf("<walkthrough>");
+    expect(walkthrough).toBeGreaterThan(source);
+    expect(xml.indexOf("<files>")).toBeGreaterThan(xml.indexOf("</walkthrough>"));
+  });
+
+  test("round-trips intent, risk, steps, verify blocks and roles", () => {
+    const state = { ...base, walkthrough: WALKTHROUGH };
+    expect(roundTrip(state)).toEqual(state);
+  });
+
+  test("risk is optional", () => {
+    const walkthrough = { ...WALKTHROUGH, risk: undefined };
+    const xml = serializeReview({ ...base, walkthrough });
+    expect(xml).not.toContain("<risk");
+    expect(deserializeReview(xml).walkthrough?.risk).toBeUndefined();
+  });
+
+  test("walkthrough files never become review files", () => {
+    const state = roundTrip({ ...base, walkthrough: WALKTHROUGH });
+    expect(state.files.map((f) => f.path)).toEqual(["src/a.ts"]);
+    expect(state.files[0].comments).toHaveLength(1);
+  });
+
+  test("reads a raw > inside attributes and xs:boolean 1 as true", () => {
+    const xml = serializeReview(base).replace(
+      "<files>",
+      `<walkthrough>
+    <intent>x</intent>
+    <risk reversible="1">r</risk>
+    <step title="Parse a > b">
+      <file path="src/a.ts" role="maps A -> B" />
+    </step>
+  </walkthrough>
+  <files>`,
+    );
+    const walkthrough = deserializeReview(xml).walkthrough;
+    expect(walkthrough?.risk?.reversible).toBe(true);
+    expect(walkthrough?.steps).toEqual([
+      { title: "Parse a > b", files: [{ path: "src/a.ts", role: "maps A -> B" }] },
+    ]);
+  });
+
+  test("a path repeated across steps keeps its first occurrence", () => {
+    const walkthrough: ReviewWalkthrough = {
+      intent: "x",
+      steps: [
+        { title: "One", files: [{ path: "src/a.ts", role: "first" }] },
+        { title: "Two", files: [{ path: "src/a.ts", role: "second" }, { path: "src/b.ts" }] },
+      ],
+    };
+    const steps = roundTrip({ ...base, walkthrough }).walkthrough?.steps;
+    expect(steps?.[0].files).toEqual([{ path: "src/a.ts", role: "first" }]);
+    expect(steps?.[1].files).toEqual([{ path: "src/b.ts" }]);
   });
 });

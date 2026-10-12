@@ -1,13 +1,14 @@
 import type { Ref } from "react";
 import { shortcutLabel } from "../../shortcuts/registry";
 import { SegmentedControl } from "../Button";
-import { CommentIcon, FileIcon, ICON_SIZE_INLINE } from "../icons";
+import { CommentIcon, FileIcon, ICON_SIZE_INLINE, RouteIcon } from "../icons";
 
-export type SidebarView = "files" | "comments";
+export type SidebarView = "files" | "comments" | "walkthrough";
 
 const PLACEHOLDERS: Record<SidebarView, string> = {
   files: "Filter files…",
   comments: "Search comments…",
+  walkthrough: "Filter steps…",
 };
 
 interface SidebarHeaderProps {
@@ -17,17 +18,20 @@ interface SidebarHeaderProps {
   query: string;
   onQueryChange: (query: string) => void;
   commentCount: number;
+  /** The review has a walkthrough: the switch offers its view. */
+  hasWalkthrough: boolean;
   inputRef: Ref<HTMLInputElement>;
 }
 
-/** One row: the active view's search and the Files/Comments switch, so adding
- *  the switch costs the sidebar no height. */
+/** One row: the active view's search and the view switch (Walkthrough when the
+ *  review has one, Files, Comments), so the switch costs the sidebar no height. */
 export default function SidebarHeader({
   view,
   onViewChange,
   query,
   onQueryChange,
   commentCount,
+  hasWalkthrough,
   inputRef,
 }: SidebarHeaderProps) {
   return (
@@ -62,7 +66,17 @@ export default function SidebarHeader({
         aria-label="Sidebar view"
         value={view}
         onChange={onViewChange}
+        // The walkthrough leads: it is where the review opens and reads first.
         options={[
+          ...(hasWalkthrough
+            ? [
+                {
+                  value: "walkthrough" as const,
+                  title: "Walkthrough",
+                  label: <RouteIcon size={ICON_SIZE_INLINE} />,
+                },
+              ]
+            : []),
           { value: "files", title: "Files", label: <FileIcon size={ICON_SIZE_INLINE} /> },
           {
             value: "comments",

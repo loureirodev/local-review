@@ -1,7 +1,6 @@
 # Agent Instructions
 
-## Package Manager
-Use **bun**: `bun install`, `bun run dev`, `bun run build`
+`CONTRIBUTING.md` is the source of truth for commands, tests, project structure, architecture, code style and commit conventions. Read it before starting work.
 
 ## Commit Attribution
 AI commits MUST include:
@@ -9,30 +8,9 @@ AI commits MUST include:
 Co-Authored-By: <agent name> <noreply@example.com>
 ```
 
-## Commit Conventions
-Conventional Commits enforced via `commitlint` + `husky`. Lowercase type, imperative subject, no trailing period.
+## Before you change
+- **Anything visual** — read `DESIGN.md` first (colour roles, themes, typography, icon rules, shadows) and update it when you make a visual decision.
+- **The `review.xml` format, a CLI flag or a skill command** — `.claude/skills/local-review/` ships to users; update every file listed in `CONTRIBUTING.md` § "The `local-review` skill" in the same change.
 
-## File-Scoped Commands
-| Task | Command |
-|------|---------|
-| Typecheck | `bun run typecheck` |
-| Lint file | `bunx @biomejs/biome check path/to/file.ts` |
-| Fix file | `bun run lint:fix-files path/to/file.ts` |
-| Lint all | `bun run lint` |
-| Build | `bun run build` |
-
-## Architecture
-- **CLI/Server** — `src/cli/` (Bun HTTP server, git ops, XML serialization)
-- **Frontend** — `src/web/` (React 19 + Vite + Tailwind v4)
-- **Shared types** — `src/shared/types.ts` (used by both CLI and web)
-- **Path alias** — `@shared` → `src/shared` (in `vite.config.ts` and `tsconfig.json`)
-- **Diff rendering** — `@pierre/diffs` `CodeView` (Shiki-based; per-line virtualization in a single owned scroll container, imperative `initialItems` + `ref.updateItem`). See `src/web/components/DiffViewer.tsx` + `diff/useCodeViewItems.ts`
-
-## Dev Proxy
-- Vite (`:5173`) proxies `/api` → CLI server (`:3000`)
-- CLI `--dev` proxies non-API → Vite (`:5173`)
-
-## Key Conventions
-- **Visual conventions live in `DESIGN.md`** — colour roles, themes, typography, icon rules, shadows. Consult it before any visual change and update it when a visual decision is made. Never introduce a literal colour class (`text-neutral-300`, `bg-blue-500`); use the role utilities (`text-muted`, `bg-accent`).
-- Code style enforced by Biome — see `biome.json`
-- See `CONTRIBUTING.md` for setup, project structure, and workflow
+## Done
+`bun test`, `bun run typecheck` and `bun run lint` pass; after React changes, `bun run react-doctor` too.

@@ -1,6 +1,6 @@
 // XML serializer: ReviewState → XML with custom schema
 
-import type { DiffSource, ReviewComment, ReviewState } from "../shared/types";
+import type { DiffSource, ReviewComment, ReviewState, ReviewWalkthrough } from "../shared/types";
 
 function escapeXml(str: string): string {
   return str
@@ -72,6 +72,29 @@ function serializeSourceAttrs(source: DiffSource): string {
     .join(" ");
 }
 
+function serializeWalkthrough(walkthrough: ReviewWalkthrough, level: number): string {
+  const lines: string[] = [];
+  lines.push(`${indent(level)}<walkthrough>`);
+  lines.push(`${indent(level + 1)}<intent>${escapeXml(walkthrough.intent)}</intent>`);
+  if (walkthrough.risk) {
+    const { reversible, body } = walkthrough.risk;
+    lines.push(`${indent(level + 1)}<risk reversible="${reversible}">${escapeXml(body)}</risk>`);
+  }
+  for (const step of walkthrough.steps) {
+    lines.push(`${indent(level + 1)}<step title="${escapeXml(step.title)}">`);
+    if (step.verify) {
+      lines.push(`${indent(level + 2)}<verify>${escapeXml(step.verify)}</verify>`);
+    }
+    for (const file of step.files) {
+      const roleAttr = file.role ? ` role="${escapeXml(file.role)}"` : "";
+      lines.push(`${indent(level + 2)}<file path="${escapeXml(file.path)}"${roleAttr} />`);
+    }
+    lines.push(`${indent(level + 1)}</step>`);
+  }
+  lines.push(`${indent(level)}</walkthrough>`);
+  return lines.join("\n");
+}
+
 export function serializeReview(state: ReviewState): string {
   const lines: string[] = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
@@ -79,6 +102,10 @@ export function serializeReview(state: ReviewState): string {
   lines.push(`${indent(1)}<timestamp>${escapeXml(state.timestamp)}</timestamp>`);
 
   lines.push(`${indent(1)}<source ${serializeSourceAttrs(state.source)} />`);
+
+  if (state.walkthrough) {
+    lines.push(serializeWalkthrough(state.walkthrough, 1));
+  }
 
   // Files
   lines.push(`${indent(1)}<files>`);

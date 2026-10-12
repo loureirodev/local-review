@@ -1,71 +1,45 @@
-# Action: open
+# open — launch the review UI
 
-Launches the local-review web UI in the browser so the user can review
-interactively. By default the UI starts clean. Pass `--existing` to load a
-previously saved review.xml into the UI (comments + viewed state).
+The UI loads a review file only with `--existing`; a clean session ignores it and overwrites it on export. A walkthrough therefore reaches the UI only inside a review opened with `--existing`, and that is how a clean start with a walkthrough works: a review file with the walkthrough and no comments.
 
-The launch mode is fixed for the whole session:
+The mode is fixed for the session: pending changes (no flag, with an `Unstaged | Staged` toggle), `--branch [base]` (default base: main, master or develop), or `--folder <path>` (no diff, no git needed). `--branch` and `--folder` exclude each other.
 
-| Flag | Mode |
-|---|---|
-| *(none)* | Pending changes, with an `Unstaged | Staged` toggle in the UI |
-| `--branch [base]` | Current branch vs `base` (autodetected: main, master, develop) |
-| `--folder <path>` | Files of a folder, no diff; works outside a git repo |
+## Step 1 — Verify
 
-`--branch` and `--folder` are mutually exclusive.
+- **`--existing`**: run [branch-check.md](branch-check.md). Cancel or stop: the server does not start. Remember whether the user chose to continue on another branch, and the worktree if it moved to one.
+- **Clean, not `--folder`**: `git rev-parse --show-toplevel`; on failure, report it and stop.
 
----
+## Step 2 — Offer a walkthrough
 
-## Step 1 — Resolve the review.xml path
+Ask only when the review lacks one; a walkthrough is written on request, never on its own. Skip this step when:
 
-- Default: `./review.xml` in the current working directory.
-- If the user passed `--input <path>`, use that path instead.
+- the mode is `--folder`, or the review's `<source>` is `type="folder"`;
+- `--existing` and the review already has a `<walkthrough>`;
+- the user already answered for this review in this conversation (in the request, or when an import asked).
 
----
+Otherwise ask with AskUserQuestion:
 
-## Step 2 — Verify before launching
+| Session | Question | On yes |
+|---|---|---|
+| `--existing` | "This review has no walkthrough. Write one before opening?" | [walkthrough.md](walkthrough.md) from its Step 2, on this review's diff (the branch check is done) |
+| Clean | "Start with a walkthrough of <the pending changes \| the branch against <base>>?" | [walkthrough.md](walkthrough.md) Step 1 "No review file" for the launch mode, then launch with `--existing` |
 
-- **Clean session:** in any mode but `--folder`, check the repository with
-  `git rev-parse --show-toplevel`; if it fails, report the error and stop.
-- **With `--existing`:** run [branch-check.md](branch-check.md). If it ends in
-  cancel or a stop, the server must not start. Remember whether the user chose
-  to continue on another branch, and the worktree directory if it moved there
-  (the server then runs inside it, with the absolute review path).
+In a clean session whose review file already exists, the yes option says it replaces `<review-path>` and its comments; a user who wants to keep them picks no, or opens with `--existing`.
 
----
+Done when the user answered, and on yes the walkthrough validates.
 
 ## Step 3 — Run the server
 
-Clean session — pass the mode the user asked for, if any:
+Run it in the background; it opens the browser and prints its URL.
 
 ```bash
-local-review --output-file <review-xml-path> [--branch [base] | --folder <path>] [--port <port>]
+# clean session
+local-review --output-file <review-path> [--branch [base] | --folder <path>] [--port <port>]
+
+# --existing, or a clean start with a walkthrough: no mode flag, the CLI takes it from <source>
+local-review --output-file <review-path> --existing [--no-check] [--port <port>]
 ```
 
-With `--existing` — pass **no mode flag**: the CLI derives it from the review
-(a PR review opens as `--branch <target>`, a folder review as
-`--folder <path>`, …). Add `--no-check` only if the user chose to continue on
-another branch; otherwise the CLI re-checks and would exit with status 3.
+`--no-check` only when the user chose to continue on another branch; otherwise the CLI re-checks and exits with status 3. In a worktree, run it inside the worktree with the absolute review path.
 
-```bash
-local-review --output-file <review-xml-path> --existing [--no-check] [--port <port>]
-```
-
-Run it in the background: the server keeps running until stopped. The browser
-opens automatically and the server prints its URL on startup.
-
-Tell the user:
-- The URL (e.g. `http://localhost:XXXXX`)
-- The launch mode used (from the UI header, or the flag passed)
-- Where exports will be saved (`<review-xml-path>`)
-- The worktree directory, if the review opened in one
-- Whether comments were loaded from an existing file (if `--existing` was used)
-- How to stop: `Ctrl+C`
-
----
-
-## Typical follow-up after `import`
-
-1. `import <URL>` → writes review.xml with PR/MR comments
-2. `open --existing` → checks the branch, launches the UI on the PR's diff
-3. `apply` → Claude implements the actionable comments as code changes
+Tell the user: the URL, the mode, where exports are saved, the worktree if any, whether comments and a walkthrough were loaded, and `Ctrl+C` to stop.

@@ -22,6 +22,7 @@ local-review ships an agent skill that automates the import and apply steps. Com
 | `/local-review import <URL>` | Fetch comments from a GitHub PR or GitLab MR and write `review.xml` |
 | `/local-review apply` | Read `review.xml` and apply suggestions / instructions to the working tree |
 | `/local-review open` | Launch the review UI in the browser (`--existing` checks the review's branch first) |
+| `/local-review walkthrough` | Write the change's intent, risk and reading steps into `review.xml` (`--branch [base]`) |
 | `/local-review help` | Show all available options |
 
 ### Setup
@@ -85,6 +86,12 @@ The skill handles three types of comment bodies:
 - **Prose instructions** (e.g. "rename `foo` to `bar`"): the agent interprets and applies the change
 
 Changes are applied to the working tree only — no automatic `git add` or `git commit`.
+
+### Walkthroughs
+
+A large change is easier to review in the order its author would explain it. `/local-review walkthrough` writes a `<walkthrough>` block into `review.xml`: why the change exists and what it could break, then the files grouped into steps in reading order, each with what to verify. Every import (PR, MR or agent review) and `/local-review open` offer to write one when the review has none; `--walkthrough` / `--no-walkthrough` on an import answer in advance. On an existing review it replaces only the walkthrough and keeps every comment. To start a review from scratch with a walkthrough, accept the offer in a clean `open`: it writes a review with the walkthrough and no comments, and opens it with `--existing`.
+
+In the UI the walkthrough is a sidebar view. The intent opens first, with the risk and a card per step. Selecting a step shows only its files, with its verify block above them and *Mark step as viewed* and *Next* in a bar under the diff. Files no step covers stay under Other changes, and the Files view shows the plain diff.
 
 ### Branch check
 
@@ -175,14 +182,11 @@ Options:
 - **Line-level & file-level comments**: Add comments to specific lines or entire files
 - **Progress tracking**: Mark files as viewed and track your review progress
 - **File filtering**: Quickly find files with search
+- **Walkthroughs**: Read a change step by step, in the order an agent proposes
+- **Markdown and diagrams**: Comments and walkthroughs render GFM and Mermaid diagrams
 - **XML export**: Save your review for AI agents or later reference
 - **GitHub/GitLab integration**: Import PR/MR comments via agent skill
 - **Cross-platform**: Linux, macOS, and WSL2
-
-## Future
-
-- Markdown support in comments
-- Keyboard shortcuts for navigation
 
 ## Contributing
 
