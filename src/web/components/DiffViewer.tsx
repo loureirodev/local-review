@@ -7,7 +7,17 @@ import type {
 } from "@pierre/diffs/react";
 import { CodeView, WorkerPoolContextProvider } from "@pierre/diffs/react";
 import type { FileReviewState, ReviewComment } from "@shared/types";
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  memo,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useCollapse } from "../context/CollapseContext";
 import { useReview } from "../context/ReviewContext";
 import { useMountEffect } from "../hooks/useMountEffect";
@@ -18,7 +28,7 @@ import CommentDisplay from "./CommentDisplay";
 import { type ActiveInput, CommentInputOverlay } from "./diff/CommentInputOverlay";
 import { HIGHLIGHTER_OPTIONS, THEME, WORKER_POOL_OPTIONS } from "./diff/constants";
 import type { CommentAnnotation, FolderFileState, ViewerEntry } from "./diff/diffParsing";
-import { EMPTY_COMMENTS, toDiffSide } from "./diff/diffParsing";
+import { EMPTY_COMMENTS, entryName, toDiffSide } from "./diff/diffParsing";
 import {
   AddCommentButton,
   FileCommentBadge,
@@ -58,14 +68,28 @@ export interface NavigationTarget {
   fileComment?: boolean;
 }
 
+/** What a walkthrough focus makes the viewer show. */
+export interface DiffFocus {
+  /** Identity of the focused entry: a new one starts the diff from the top. */
+  key: string;
+  /** Files shown, in reading order. */
+  paths: readonly string[];
+  /** Walkthrough roles, shown in the file headers. */
+  roles: ReadonlyMap<string, string>;
+  /** Above the first file, scrolling with them. */
+  header: ReactNode;
+}
+
 interface DiffViewerProps {
   content: ViewerContent;
   /** Identity of the diff being viewed (mode + branches). Changing it remounts
    *  the viewer, resetting the scroll — switching to a different diff should
    *  start at the top. Changes to the *contents* of the same diff keep the key
-   *  and are reconciled in place, preserving the reader's position (D8). */
+   *  and are reconciled in place, preserving the reader's position. */
   diffKey: string;
   navigationTarget: NavigationTarget | null;
+  /** Null: every file, in tree order, with no walkthrough blocks. */
+  focus: DiffFocus | null;
   reviewFiles: Record<string, FileReviewState>;
   /** Called once the target is acted on, with that target. */
   onNavigationHandled: (target: NavigationTarget) => void;
@@ -116,6 +140,7 @@ function DiffViewerInner({
   content,
   diffKey,
   navigationTarget,
+  focus,
   reviewFiles,
   onNavigationHandled,
   onAddComment,
@@ -151,14 +176,27 @@ function DiffViewerInner({
     () => fileDiffs.map((fileDiff) => ({ type: "diff", fileDiff })),
     [fileDiffs],
   );
-  const { entries, lineAnnotationsByFile, fileLevelCommentsByFile } = folder
-    ? folderData
-    : { ...diffData, entries: diffEntries };
+  const {
+    entries: allEntries,
+    lineAnnotationsByFile,
+    fileLevelCommentsByFile,
+  } = folder ? folderData : { ...diffData, entries: diffEntries };
+
+  // A walkthrough focus narrows and reorders the files; a change of file set
+  // goes through the same `setItems` reconcile as a reload.
+  const focusPaths = focus?.paths;
+  const entries = useMemo(() => {
+    if (!focusPaths) return allEntries;
+    const byName = new Map(allEntries.map((entry) => [entryName(entry), entry]));
+    return focusPaths.flatMap((path) => byName.get(path) ?? []);
+  }, [allEntries, focusPaths]);
+  const roles = focus?.roles;
+  const getRole = useCallback((path: string) => roles?.get(path), [roles]);
 
   // Folder markdown files shown rendered (diffs always show code).
   const { previewable, sourceFiles, setPreview, getPreview } = useMarkdownPreview(entries);
 
-  const codeViewRef = useRef<CodeViewHandle<CommentAnnotation>>(null);
+  const codeViewRef = useRef<CodeViewHandle<CommentAnnotation, undefined>>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
 
   const { filesKey, initialItems, collectUpdatedItems, buildAllItems } = useCodeViewItems({
@@ -168,11 +206,18 @@ function DiffViewerInner({
     reviewFiles,
     getIsCollapsed,
     getPreview,
+    getRole,
   });
 
   // Live data for the header-metadata callback; annotations live on the item itself.
-  const metaRef = useRef({ reviewFiles, fileLevelCommentsByFile, previewable, sourceFiles });
-  metaRef.current = { reviewFiles, fileLevelCommentsByFile, previewable, sourceFiles };
+  const metaRef = useRef({
+    reviewFiles,
+    fileLevelCommentsByFile,
+    previewable,
+    sourceFiles,
+    getRole,
+  });
+  metaRef.current = { reviewFiles, fileLevelCommentsByFile, previewable, sourceFiles, getRole };
 
   // Pending collapse anchor: when a file collapsed from above the viewport, its
   // shrink would shift the visible content up. Captured at toggle time and
@@ -226,37 +271,45 @@ function DiffViewerInner({
     [toggleFile],
   );
 
-  // File-set reconcile (D8): adding, removing or reordering files can't be
-  // expressed as a targeted `updateItem` pass, so hand CodeView the full
-  // ordered list. `setItems` reconciles by id — records for surviving files are
-  // reused with their measured height, and it anchors the scroll on a surviving
-  // item, so the reader keeps their position instead of being thrown to the top
-  // by a remount. Reached through `getInstance()`: the React handle exposes
-  // `removeItem`/`addItems` but not `setItems`, and `addItems` only appends,
-  // which would misplace a new file that belongs in the middle of tree order.
+  // File-set reconcile: `setItems` reconciles by id, keeping measured
+  // heights and the scroll position a remount would lose.
+  // Only on `getInstance()`: the React handle's `addItems` just appends.
+  // Declared before the bridge effect so the bridge finds nothing stale.
   //
-  // Declared before the bridge effect so it runs first; the bridge then finds
-  // no stale signatures and no-ops.
-  const lastReconcileRef = useRef({ diffKey, filesKey });
+  // A new walkthrough focus remounts CodeView: reordering through `setItems`
+  // left its item tops out of step with the DOM.
+  const viewKey = focus ? `${diffKey}\n${focus.key}` : diffKey;
+  const lastReconcileRef = useRef({ viewKey, filesKey });
+  // True until the frame after the items are replaced, when their lines can be
+  // resolved. Held, not consumed, so a navigation that re-runs still waits.
+  const reconciledRef = useRef(false);
   useEffect(() => {
+    const markReconciled = () => {
+      reconciledRef.current = true;
+      requestAnimationFrame(() => {
+        reconciledRef.current = false;
+      });
+    };
     const last = lastReconcileRef.current;
-    // A new `diffKey` remounts CodeView, which re-seeds from `initialItems` —
+    // A new key remounts CodeView, which re-seeds from `initialItems` —
     // nothing to reconcile, just adopt the new file set as the baseline.
-    if (last.diffKey !== diffKey) {
-      lastReconcileRef.current = { diffKey, filesKey };
+    if (last.viewKey !== viewKey) {
+      lastReconcileRef.current = { viewKey, filesKey };
+      markReconciled();
       return;
     }
     if (last.filesKey === filesKey) return;
     const instance = codeViewRef.current?.getInstance();
     // No instance yet: leave the baseline untouched so a later run retries.
     if (!instance) return;
-    lastReconcileRef.current = { diffKey, filesKey };
+    lastReconcileRef.current = { viewKey, filesKey };
     instance.setItems(buildAllItems());
-  }, [diffKey, filesKey, buildAllItems]);
+    markReconciled();
+  }, [viewKey, filesKey, buildAllItems]);
 
-  // State→viewer bridge (D2): re-emit via `updateItem` only the items whose render
+  // State→viewer bridge: re-emit via `updateItem` only the items whose render
   // signature changed (comments, viewed, collapse, folder files once fetched).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles/getIsCollapsed/getPreview/entries are the change triggers read through refs in collectUpdatedItems
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reviewFiles/getIsCollapsed/getPreview/entries/getRole are the change triggers read through refs in collectUpdatedItems
   useEffect(() => {
     const ref = codeViewRef.current;
     if (!ref) return;
@@ -271,7 +324,7 @@ function DiffViewerInner({
       pendingAnchorRef.current = null;
       ref.scrollTo({ type: "item", id: anchor.id, align: "start", behavior: "instant" });
     }
-  }, [reviewFiles, getIsCollapsed, getPreview, entries, collectUpdatedItems]);
+  }, [reviewFiles, getIsCollapsed, getPreview, entries, getRole, collectUpdatedItems]);
 
   // Folder mode: fetch a file when its section is expanded. `onLoadFile` dedupes,
   // so this depends on collapse state only, not on each finished load.
@@ -365,14 +418,17 @@ function DiffViewerInner({
       } else {
         // Re-resolved by CodeView every frame, so a far file that is not
         // measured yet still ends on the line.
-        codeViewRef.current?.scrollTo({
-          type: "line",
-          id: file,
-          lineNumber: comment.line,
-          side: toDiffSide(comment.side),
-          align: "center",
-          behavior: "smooth",
-        });
+        const scrollToLine = () =>
+          codeViewRef.current?.scrollTo({
+            type: "line",
+            id: file,
+            lineNumber: comment.line,
+            side: toDiffSide(comment.side),
+            align: "center",
+            behavior: "smooth",
+          });
+        if (reconciledRef.current) navFrameRef.current = requestAnimationFrame(scrollToLine);
+        else scrollToLine();
         setFlash({ kind: "comment", id: comment.id });
       }
     }
@@ -520,6 +576,24 @@ function DiffViewerInner({
     [handleToggleCollapsed],
   );
 
+  // Slotted after the file name, so document styles reach it.
+  const renderHeaderFilenameSuffix = useCallback((item: DiffCodeViewItem) => {
+    const role = metaRef.current.getRole(item.id);
+    return role ? (
+      <span
+        title={role}
+        // A phone has no room beside the name: the name wins.
+        className="block min-w-0 max-w-[48ch] truncate pl-2 text-muted font-normal max-sm:hidden"
+      >
+        {role}
+      </span>
+    ) : null;
+  }, []);
+
+  const header = focus?.header ?? null;
+  // Always passed: adding or removing it changes CodeView's options.
+  const renderCodeViewHeader = useCallback(() => header, [header]);
+
   const renderHeaderMetadata = useCallback(
     (item: DiffCodeViewItem) => {
       const filePath = item.id;
@@ -646,7 +720,7 @@ function DiffViewerInner({
     [theme, diffStyle, wrapLines, showLineNumbers, fontSize, lineHeight, handlePostRender],
   );
 
-  if (entries.length === 0) {
+  if (allEntries.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted">
         <div className="text-center">
@@ -668,7 +742,7 @@ function DiffViewerInner({
   return (
     <>
       <CodeView<CommentAnnotation>
-        key={diffKey}
+        key={viewKey}
         ref={codeViewRef}
         initialItems={initialItems}
         // CodeView.setup() attaches its scroll listener to this root but does
@@ -681,7 +755,9 @@ function DiffViewerInner({
         className="h-full min-h-0 overflow-y-auto overflow-x-clip overscroll-contain [contain:strict] [overflow-anchor:none] [&_diffs-container]:overflow-clip [&_diffs-container]:[contain:layout_paint_style]"
         renderAnnotation={renderAnnotation}
         renderHeaderPrefix={renderHeaderPrefix}
+        renderHeaderFilenameSuffix={renderHeaderFilenameSuffix}
         renderHeaderMetadata={renderHeaderMetadata}
+        renderCodeViewHeader={renderCodeViewHeader}
         renderGutterUtility={renderGutterUtility}
         options={codeViewOptions}
       />

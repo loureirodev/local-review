@@ -23,6 +23,8 @@ interface UseCodeViewItemsParams {
   reviewFiles: Record<string, FileReviewState>;
   getIsCollapsed: (filePath: string) => boolean;
   getPreview: (filePath: string) => string | null;
+  /** The file's walkthrough role while one shows in its header. */
+  getRole: (filePath: string) => string | undefined;
 }
 
 export interface CodeViewItemsResult {
@@ -136,10 +138,10 @@ export function fileContents(name: string, file: FolderFileState | undefined): F
 
 /**
  * Maps viewer entries (file diffs, or raw folder files) to CodeView items and
- * owns the per-item `version` signature (D4). Render-affecting state (collapsed,
+ * owns the per-item `version` signature. Render-affecting state (collapsed,
  * viewed, comments, and the underlying content) is folded into a string `sig`;
  * when it changes, `version` is bumped and the item re-emitted so the viewer
- * refreshes only that item via `updateItem` without recreating the list (D2).
+ * refreshes only that item via `updateItem` without recreating the list.
  */
 export function useCodeViewItems({
   entries,
@@ -148,6 +150,7 @@ export function useCodeViewItems({
   reviewFiles,
   getIsCollapsed,
   getPreview,
+  getRole,
 }: UseCodeViewItemsParams): CodeViewItemsResult {
   const entryById = useMemo(() => {
     const map = new Map<string, ViewerEntry>();
@@ -167,6 +170,7 @@ export function useCodeViewItems({
     reviewFiles,
     getIsCollapsed,
     getPreview,
+    getRole,
   });
   latest.current = {
     entryById,
@@ -175,6 +179,7 @@ export function useCodeViewItems({
     reviewFiles,
     getIsCollapsed,
     getPreview,
+    getRole,
   };
 
   const versionRef = useRef<VersionMap>(new Map());
@@ -187,9 +192,12 @@ export function useCodeViewItems({
       reviewFiles: review,
       getIsCollapsed: isCollapsed,
       getPreview: previewOf,
+      getRole: roleOf,
     } = latest.current;
     const entry = byId.get(id);
     const collapsed = isCollapsed(id) ? 1 : 0;
+    // The header is only re-rendered with the item, so the role is part of it.
+    const role = hashString(roleOf(id) ?? "");
     const preview = previewOf(id) === null ? 0 : 1;
     const viewed = review[id]?.viewed ? 1 : 0;
 
@@ -205,7 +213,7 @@ export function useCodeViewItems({
       for (const comment of fileComments) parts.push(commentSig(comment));
     }
 
-    return `${collapsed}|${viewed}|${preview}|${contentSig(entry)}|${parts.join(",")}`;
+    return `${collapsed}|${viewed}|${preview}|${role}|${contentSig(entry)}|${parts.join(",")}`;
   }, []);
 
   const buildItem = useCallback((id: string, version: number): DiffCodeViewItem | undefined => {

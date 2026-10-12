@@ -233,6 +233,17 @@ export function FileIcon({ size, className }: IconProps) {
   );
 }
 
+/** A route between two stops: the sidebar's Walkthrough view. */
+export function RouteIcon({ size, className }: IconProps) {
+  return (
+    <Icon size={size} className={className}>
+      <circle cx="6" cy="19" r="2" />
+      <circle cx="18" cy="5" r="2" />
+      <path d="M8 19h8.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7H16" />
+    </Icon>
+  );
+}
+
 /** A question mark in a circle: the keyboard shortcuts help. */
 export function HelpIcon({ size, className }: IconProps) {
   return (

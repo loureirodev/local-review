@@ -1,6 +1,13 @@
 // XML deserializer: XML → ReviewState (inverse of xml-serializer.ts)
 
-import type { DiffSource, FileReviewState, ReviewComment, ReviewState } from "../shared/types";
+import type {
+  DiffSource,
+  FileReviewState,
+  ReviewComment,
+  ReviewState,
+  ReviewWalkthrough,
+  WalkthroughStep,
+} from "../shared/types";
 
 function unescapeXml(str: string): string {
   return str
@@ -81,15 +88,66 @@ export function isLegacyReview(xml: string): boolean {
   return /<source\s[^>]*type="local"/.test(xml);
 }
 
+/** The first `<tag>…</tag>` block, tags included. Sections are parsed apart so
+ *  a walkthrough `<file>` can never be read as a review file, or the reverse. */
+function getSection(xml: string, tag: string): string | null {
+  return xml.match(new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`))?.[0] ?? null;
+}
+
+/** An element's attributes. Matched as quoted values, not up to the first `>`:
+ *  a raw `>` is legal inside one (`role="maps A -> B"`). */
+const ATTRS = String.raw`((?:\s+[\w:-]+="[^"]*")*)\s*`;
+
+/** `xs:boolean` also allows `1` and `0`. */
+const isTrue = (value: string | null) => value === "true" || value === "1";
+
+function parseWalkthrough(section: string): ReviewWalkthrough {
+  const intent = getTagContent(section, "intent") ?? "";
+
+  const riskMatch = section.match(new RegExp(`<risk${ATTRS}>([\\s\\S]*?)<\\/risk>`));
+  const risk = riskMatch
+    ? {
+        reversible: isTrue(getAttr(riskMatch[1], "reversible")),
+        body: unescapeXml(riskMatch[2].trim()),
+      }
+    : undefined;
+
+  // A file belongs to at most one step: later occurrences are dropped.
+  const seen = new Set<string>();
+  const steps: WalkthroughStep[] = [];
+  for (const stepMatch of section.matchAll(
+    new RegExp(`<step${ATTRS}>([\\s\\S]*?)<\\/step>`, "g"),
+  )) {
+    const stepBody = stepMatch[2];
+    const files: WalkthroughStep["files"] = [];
+    for (const fileMatch of stepBody.matchAll(new RegExp(`<file${ATTRS}\\/>`, "g"))) {
+      const path = getAttr(fileMatch[1], "path");
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
+      files.push({ path, role: getAttr(fileMatch[1], "role") || undefined });
+    }
+    steps.push({
+      title: getAttr(stepMatch[1], "title") ?? "",
+      verify: getTagContent(stepBody, "verify") || undefined,
+      files,
+    });
+  }
+
+  return { intent, risk, steps };
+}
+
 export function deserializeReview(xml: string): ReviewState {
   const timestamp = getTagContent(xml, "timestamp") ?? new Date().toISOString();
   const source = parseSource(xml);
+
+  const walkthroughSection = getSection(xml, "walkthrough");
+  const walkthrough = walkthroughSection ? parseWalkthrough(walkthroughSection) : undefined;
 
   const files: FileReviewState[] = [];
   // Match <file> blocks — use greedy [\s\S]* with </file> followed by
   // whitespace+<file or whitespace+</files to find the correct closing tag,
   // avoiding premature match on child <file> elements inside <comment>.
-  for (const fileMatch of xml.matchAll(
+  for (const fileMatch of (getSection(xml, "files") ?? "").matchAll(
     /<file path="([^"]*)" viewed="([^"]*)">([\s\S]*?)<\/file>(?=\s*<(?:file |\/files))/g,
   )) {
     const path = unescapeXml(fileMatch[1]);
@@ -104,5 +162,5 @@ export function deserializeReview(xml: string): ReviewState {
     files.push({ path, viewed, comments });
   }
 
-  return { timestamp, source, files };
+  return { timestamp, source, ...(walkthrough && { walkthrough }), files };
 }

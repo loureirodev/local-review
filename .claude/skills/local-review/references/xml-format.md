@@ -1,121 +1,40 @@
-# XML format — mapping, assembly, validation, and report
+# XML format — assemble and validate a review
 
-This reference covers the shared steps that follow fetching from GitHub or GitLab:
-general-comment resolution, XML mapping, assembly, XSD validation, and the write + report.
+Step 5 of [import.md](import.md). The schema is [../assets/review.xsd](../assets/review.xsd); this file is how to fill it.
 
-## Handle `--last-comment` flag
-
-If `--last-comment` was given:
-- Combine all fetched comments into a single list.
-- Sort by `created_at` descending.
-- Keep only the single most recent comment.
-- All further steps apply to that one comment only.
-
-## Map comments to ReviewComment entries
-
-**Inline comment** (GitHub review comment / GitLab diff note with a `position` object):
-
-```xml
-<comment id="<forge>-<id>">
-  <file><path></file>
-  <line number="<line-number>" side="<addition|deletion>" />
-  <body><escaped-body></body>
-  <created-at><iso-datetime></created-at>
-  <url><permalink-to-original-comment></url>   <!-- forge imports only -->
-</comment>
-```
-
-**General comment** (no file/line attachment):
-
-1. Run `git ls-files` in the current directory to get all tracked paths.
-2. Scan the comment body for file path mentions (backtick-quoted paths, "in `file.ts`",
-   function names followed by a filename, etc.).
-3. For each mention that fuzzy-matches a tracked path (substring or basename match),
-   produce one `<comment>` attached to that file.
-4. **Resolve to a specific line** whenever possible — see
-   [line-resolution.md](line-resolution.md) for the full algorithm. Read the
-   target file and search for referenced code (function names, variables,
-   snippets) to determine the exact line number.
-5. If no file reference can be resolved, produce one `<comment>` with
-   `<file>_discussion</file>` (no `<line>` element).
-
-All text content must be XML-escaped: `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`.
-
-## Assemble the XML document
-
-Group all comments by their `<file>` path. For each unique path, create a
-`<file path="..." viewed="false">` element with comments in chronological order.
-The `_discussion` bucket, if present, goes last.
+## Document
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <review>
-  <timestamp><current-ISO-datetime></timestamp>
-  <source type="github-pr" owner="<owner>" repo="<repo>" pr="<number>"
-          base="<target-branch>" head="<head-branch>" commit="<head-sha>" />
-  <!-- OR: <source type="gitlab-mr" project="<project>" mr="<number>" base="..." head="..." commit="..." /> -->
-  <!-- OR: <source type="agent" head="<branch>" commit="<sha>" /> -->
-  <!-- Written by the UI: type="branch" base="...", type="pending" staged="true|false",
-       type="folder" path="<absolute-path>" -->
+  <timestamp>2024-01-15T10:30:00Z</timestamp>
+  <source type="github-pr" owner="o" repo="r" pr="1" base="main" head="feat/x" commit="3f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39" />
+  <!-- <walkthrough>, when present, goes here: see walkthrough.md -->
   <files>
-    <file path="<path>" viewed="false">
+    <file path="src/foo.ts" viewed="false">
       <comment id="gh-123">
         <file>src/foo.ts</file>
-        <line number="42" side="addition" />   <!-- omit for file-level comments -->
+        <line number="42" side="addition" />   <!-- omitted on file-level comments -->
         <body>Rename this variable.</body>
         <created-at>2024-01-15T10:30:00Z</created-at>
-        <url>https://github.com/owner/repo/pull/1#discussion_r123</url>  <!-- optional -->
+        <url>https://github.com/o/r/pull/1#discussion_r123</url>   <!-- forges only -->
       </comment>
     </file>
-    <!-- ... -->
-    <file path="_discussion" viewed="false">   <!-- general comments, if any -->
-      ...
+    <file path="_discussion" viewed="false">   <!-- last, only if any comment landed here -->
+      …
     </file>
   </files>
 </review>
 ```
 
-## Validate before writing
+- One `<file>` per distinct path, `viewed="false"`, comments in `createdAt` order. `_discussion` goes last.
+- Escape every text node and attribute value: `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`. No CDATA.
+- `<source>` takes the attributes its source reference gives, always with `head` and `commit` when known. The attributes each `type` requires are listed in the schema's header comment.
 
-Cross-check the generated XML against [../assets/review.xsd](../assets/review.xsd):
+## Validate
 
-- Root element is `<review>`.
-- `<timestamp>` present and non-empty.
-- `<source>` has a valid `type` attribute (`branch`, `pending`, `folder`,
-  `github-pr`, `gitlab-mr`, or `agent`). There is no `local` type any more.
-- `type="branch"`: `base` is present. `type="pending"`: `staged` is `true`/`false`.
-  `type="folder"`: `path` is present.
-- `type="github-pr"`: `owner`, `repo`, and `pr` (integer) are present; `base` optional.
-- `type="gitlab-mr"`: `project` and `mr` (integer) are present; `base` optional.
-- `type="agent"`: `agent` is optional (string).
-- `head` (branch) and `commit` (40-char hex SHA) are optional on every type
-  except `folder`. Always write them on import when known.
-- Each `<comment>` has `id` attribute plus `<file>`, `<body>`, `<created-at>` children.
-- `<url>` is optional; when present it must be a valid URL.
-- `<line>` when present has `number` (positive integer) and, for diff reviews,
-  `side` (`"addition"` or `"deletion"`). Folder reviews omit `side`.
-- `viewed` on `<file>` is `"true"` or `"false"`.
-
-Fix any structural error before writing.
-
-## Write and report
-
-Write the XML to the path given by `--output` (default: `./review.xml`).
-
-Print:
-
+```bash
+xmllint --noout --schema <skill-dir>/assets/review.xsd <review-file>
 ```
-Import complete — review.xml written to <output-path>
 
-  Source:         GitHub PR #<number> (<owner>/<repo>)
-                  -- or --
-                  GitLab MR !<number> (<project>)
-  Total comments: <N>
-  Inline (line):  <N>
-  File-level:     <N>
-  Unresolved:     <N>  (stored under _discussion)
-
-To view in local-review:
-  local-review --output-file <output-path> --existing --branch <base>
-  (or `open --existing` with this skill, which checks the branch first)
-```
+Without `xmllint`, check by hand against the schema: every `<comment>` has `id`, `<file>`, `<body>`, `<created-at>`; `<line number>` is a positive integer with `side` `addition`/`deletion`; `<url>` is absolute. Done when it validates with no error.

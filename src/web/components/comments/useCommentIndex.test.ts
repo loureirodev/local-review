@@ -48,6 +48,19 @@ function review(...comments: ReviewComment[]): Record<string, FileReviewState> {
   return files;
 }
 
+describe("buildCommentIndex order", () => {
+  test("follows the given file order, with unlisted files after in tree order", () => {
+    const a = comment("src/a.ts", 2, "addition");
+    const readme = comment("README.md", 1, "addition");
+    const other = comment("docs/x.md", null, null);
+    const files = review(a, readme, other);
+    const paths = (order: string[] | null) =>
+      buildCommentIndex(files, DIFF, order).map((e) => e.comment.filePath);
+    expect(paths(null)).toEqual(["docs/x.md", "src/a.ts", "README.md"]);
+    expect(paths(["README.md", "src/a.ts"])).toEqual(["README.md", "src/a.ts", "docs/x.md"]);
+  });
+});
+
 describe("buildCommentIndex (diff)", () => {
   test("orders files by tree order, then file, orphan and line comments", () => {
     const orphan = comment("src/a.ts", 40, "addition");

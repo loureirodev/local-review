@@ -8,7 +8,7 @@ import type { SidebarView } from "./SidebarHeader";
 interface SidebarFooterProps {
   /** Folder mode: files left out of the listing. */
   skipped?: FolderTreeResponse["skipped"];
-  /** Picks the count: files in the Files view, comments in the Comments view. */
+  /** Picks the count: comments in the Comments view, the diff's files otherwise. */
   view: SidebarView;
   commentCount: number;
   onOpenHelp: () => void;

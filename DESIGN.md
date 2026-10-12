@@ -453,6 +453,31 @@ because comment cards sit inside the preview and must not inherit its density.
   a block's comments render under it as the same cards the code view shows
   under a line.
 
+### Diagrams
+
+A ` ```mermaid ` block renders as a diagram wherever markdown is rendered
+(comments, the folder preview, the walkthrough's intent, risk and verify
+blocks); the comment editor keeps it as code. The diagram uses mermaid's `base`
+theme with its `themeVariables` read from the role tokens at render time, never
+mermaid's own palette:
+
+| Diagram part | Role |
+|---|---|
+| ground, edge labels, clusters | `--bg` |
+| nodes, actors, label boxes | `--panel` fill, `--faint` border |
+| text everywhere | `--text` |
+| edges, signals, lifelines | `--muted` |
+| notes, activations, secondary nodes | `--accent-tint` fill, `--accent` border |
+| tertiary nodes | `--track` |
+
+Mermaid's colour maths only reads hex, rgb and hsl, so the OKLCH tokens are
+converted to `rgb()` first. A theme switch re-renders every diagram on screen.
+A rendered diagram drops the code block's frame and sits on the ground,
+centred and capped at the column's width. While mermaid loads, and when a
+diagram fails, the block stays a normal code block; on failure a 12px
+`--danger` line in the UI face ("Diagram could not be rendered") sits above
+the source.
+
 ## Toolbar
 
 From `md` up the toolbar's first cell (mark, wordmark, sidebar toggle) is
@@ -484,12 +509,14 @@ Below `md` (phones):
 ## Sidebar
 
 The sidebar has two views, **Files** (the tree) and **Comments** (the review's
-comments), and one frame around them:
+comments), plus **Walkthrough** when the review has one (see below), and one
+frame around them:
 
 - **Header** — a single row: the active view's search input (`flex-1`, with a
   `/` key cap at its right end while empty and unfocused) and a
-  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon`, with the
-  comment count only in the option's `title`. The bubble is empty with no
+  `SegmentedControl` of icons: `RouteIcon` first when the review has a
+  walkthrough (it is where the review opens), then `FileIcon` and
+  `CommentIcon`, with the comment count only in the option's `title`. The bubble is empty with no
   comments and `written` (two lines of text inside) once there is one. Icons only, so the input keeps
   most of the width and the header does not grow. Each view keeps its own query.
 - **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the
@@ -497,6 +524,102 @@ comments), and one frame around them:
   then Collapse all · Expand all as `LinkButton`s, and a compact `IconButton` with `HelpIcon` at the right end that
   opens the shortcuts dialog. No collapsed count: it changed on every toggle and
   said nothing the diff doesn't show.
+
+### The walkthrough
+
+A review whose `review.xml` has a walkthrough gets a third view, **Walkthrough**
+(`RouteIcon`, first in the switch: it is where the review opens), and opens
+on it with the intent selected.
+Its search placeholder is `Filter steps…`, and the shared footer stays under it
+with the diff's file count.
+
+The list is one `RowButton` per entry, in reading order:
+
+```
+ · Overview
+   Lets the reviewer read a change in the order…
+ 1 Walkthrough in review.xml          ▤1  0/5
+ ✓ Step focus in the diff             ▤2  5/5
+ · Other changes                      ▤1  0/15
+```
+
+- **Marker column**, 11px `--faint`: the step's number, `·` for the intent and
+  Other changes. A step whose files are all viewed swaps its number for
+  `CheckIcon` in `--success` and its title for `--muted`: done, but still
+  readable.
+- **Title**, 12px `--text`, wrapping rather than truncating, since titles carry
+  the step's meaning. The intent adds a second line in 11px `--muted`: its
+  first words as plain text (diagrams dropped).
+- **Progress**, 11px `--faint` tabular: the comment count with
+  `CommentIcon written` (only when there are comments), then `viewed/total`,
+  with `viewed` in `--text`, or `--success` once complete.
+- **Selected** is the comment navigator's current-card pair: a 2px `--accent`
+  left bar on `--accent-tint`.
+
+There is no entry to leave the walkthrough: the **Files** view is the plain
+diff. The Walkthrough view drives the diff with its focus, Files shows every
+file in tree order, and Comments keeps whichever was last.
+
+**The block above the files** sits on the diff ground over a `--hair` rule,
+centred in `max-width: 76rem`. From `lg` up it is two columns, so a wide screen
+holds content instead of empty ground: the reading column (`max-width: 56rem`)
+and an 18rem aside.
+
+- **Reading column**: an 11px uppercase `--faint` eyebrow (`Step 2 of 3`,
+  `Overview`, `Other changes`), then the step title at 15px weight 600, then the
+  verify block as `.md-body--normal` markdown.
+- **Aside of a step or Other changes**: a `Files` eyebrow with the step's
+  counts, a progress hairline (2px `--faint` at 25%: `--track` is the
+  cards' hover and `--hair` too close to it; filled `--accent`, `--success` once complete), and the file index: one `RowButton` per file with the name
+  in `--text` (`--muted` once viewed), the directory in 11px `--faint`, the
+  role under it in 11px `--muted`, and `CheckIcon` in `--success` or a `·` in
+  `--faint`. A click scrolls to the file. Twelve files at most, then `and N
+  more in the diff`. Below `lg` the index is hidden: the file headers carry
+  the same roles (from `sm` up; see the step bar's paragraph for phones).
+
+**The intent is a page**, not a step: it shows no files. The reading column
+holds the intent; the aside holds the risk in a `--panel` box with a `--hair`
+border (a `Risk` eyebrow and a pill, `Not reversible` on `bg-danger/18
+text-danger` or `Reversible` on `bg-success/18 text-success`) and `N steps · M
+files` in 11px `--faint`. Below both, a `Reading order` eyebrow and a grid of
+cards (1, 2 from `sm`, 3 from `xl`), the sidebar list with room to read:
+
+```
+ ┌──────────────────────────────────────┐
+ │ (1) Walkthrough in review.xml         │
+ │     Parsing is scoped to <walkthrough>│
+ │     and <files>: a walkthrough…       │
+ │     5 files                    ▤1 0/5 │
+ │     ───────────────────────────────── │
+ └──────────────────────────────────────┘
+```
+
+Each card is a `RowButton` on `--panel` with a `--hair` border and `rounded-md`,
+its `--track` hover eased in over 200ms (a row's 150ms snaps on an area this size):
+a 20px round marker (`bg-faint/25 text-muted`, which holds on the
+`--track` hover, or `bg-success/18 text-success`
+with `CheckIcon` once done), the title at 13px weight 500, the verify block's
+first words in 12px `--muted` (two lines), then the file count, the counts and
+the progress hairline. Other changes is the last card. A click focuses the
+entry.
+
+**The step bar** is pinned under the diff, outside its scroll container, so the
+actions stay in reach however long the step is. It is the toolbar's
+counterpart: `h-10`, `bg-panel`, a `--hair` rule above. From the left:
+`Mark step as viewed` (`Mark viewed` below `sm`, never wrapping) as a neutral `Button`, which becomes the `success` toggle
+`✓ Step viewed` (`aria-pressed`) once every file is viewed, and pressing it
+unmarks the step; the position in 11px `--faint` (`Step 3 of 7 · 0/6 viewed`,
+hidden below `sm`); at the right a `LinkButton` `Next: <title> ›` with `Next:`
+in `--faint` (`Start:` on the intent), absent on the last entry; the title
+truncates to fit, so the bar stays one row on any width. The intent's
+bar has no button: it has no files. The Files view has no bar.
+
+While the walkthrough drives the diff, a file's `role` follows its name in the
+diff header, in `--muted` at the header's size, truncated to one line
+(`max-width: 48ch`) with the full text in `title`. The Files view shows no
+roles. Below `sm` the header stays one row by shedding: the role goes (the
+name needs the room) and the viewed toggle shows only its ring, its label kept
+for screen readers, squared to 24px to match the compact icon buttons beside it.
 
 ### The comment navigator card
 

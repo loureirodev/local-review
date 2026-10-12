@@ -1,56 +1,25 @@
-# Line resolution — resolving comments to exact file positions
+# Line resolution — place every comment on its most specific position
 
-This reference applies to ALL import sources (GitHub, GitLab, agent). The goal
-is to ensure every comment in review.xml has the most precise `<line>` possible,
-because the UI displays comments inline with the diff.
+Step 4 of [import.md](import.md). The UI shows a comment inline only when it has a line, so a line is the target and `_discussion` the last resort. Comments that already carry a line keep it.
 
-## When to resolve
+## Comment without a file
 
-- **Inline comments with a line number**: already resolved — use as-is.
-- **General/file-level comments that reference code**: resolve to a line.
-- **Agent reviews without explicit lines**: always attempt resolution.
+1. Find the paths it mentions: backtick-quoted paths, "in `foo.ts`", a function name tied to a file.
+2. Match each against `git ls-files` (exact, then suffix, then basename).
+3. One comment per matched file, same body; suffix the id (`gh-123-1`, `gh-123-2`).
+4. No match: keep one comment on `_discussion`, with no line.
 
-## Resolution algorithm
+Then resolve each new comment's line below.
 
-For each comment that lacks a line number:
+## Comment without a line
 
-### 1. Extract code references from the body
-
-Look for:
-- Backtick-quoted identifiers: `` `functionName` ``, `` `variableName` ``
-- File path mentions: `src/foo.ts`, `in foo.ts`
-- Code snippets in fenced blocks
-- Function/method/class names in prose
-
-### 2. Read the target file
-
-Use the Read tool to get the full file contents with line numbers.
-
-### 3. Search for the referenced code
-
-Use Grep or scan the file for:
-- Function/method definitions (`function X`, `const X =`, `def X`, `class X`)
-- Variable declarations
-- Import statements
-- The exact code snippet if provided
-
-### 4. Select the best line
-
-Priority order:
-1. Exact match of a code snippet → first line of the snippet
-2. Function/method definition line → the `function`/`def`/`class` keyword line
-3. Variable assignment → the `const`/`let`/`var` line
-4. Import statement → the `import` line
-5. First occurrence of the identifier in the file
-
-### 5. Determine the side
-
-- If the line exists in the current version (right side of diff) → `"addition"`
-- If referring to deleted code → `"deletion"`
-- Default to `"addition"` for agent reviews (reviewing current code)
-
-### 6. Fall back gracefully
-
-If no line can be determined:
-- File is known → file-level comment (no `<line>` element)
-- File is unknown → `_discussion` bucket
+1. Take its code references: backtick-quoted identifiers, fenced snippets, function or class names in prose.
+2. Read the file with line numbers and search for them.
+3. Pick the line, first match wins:
+   1. the first line of a quoted snippet
+   2. the definition of the named function, method or class
+   3. the declaration of the named variable
+   4. the import of the named module
+   5. the first occurrence of the identifier
+4. Side: `addition` when the line exists in the current file; `deletion` when the comment is about removed code and you found it in the old side of the diff.
+5. Nothing matches ("this component is too complex"): leave it file-level, with no `<line>`.

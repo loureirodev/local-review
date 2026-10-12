@@ -9,7 +9,11 @@ import {
   stepComment,
   useCommentIndex,
 } from "./components/comments/useCommentIndex";
-import DiffViewer, { type NavigationTarget, type ViewerContent } from "./components/DiffViewer";
+import DiffViewer, {
+  type DiffFocus,
+  type NavigationTarget,
+  type ViewerContent,
+} from "./components/DiffViewer";
 import type { FolderFileState } from "./components/diff/diffParsing";
 import ErrorBoundary from "./components/ErrorBoundary";
 import FileTree, { type FileInfo } from "./components/FileTree";
@@ -18,6 +22,8 @@ import ShortcutsDialog from "./components/ShortcutsDialog";
 import SidebarFooter from "./components/sidebar/SidebarFooter";
 import SidebarHeader, { type SidebarView } from "./components/sidebar/SidebarHeader";
 import Toolbar from "./components/Toolbar";
+import { WalkthroughBar, WalkthroughHeader } from "./components/walkthrough/WalkthroughBlocks";
+import WalkthroughList from "./components/walkthrough/WalkthroughList";
 import { CollapseProvider } from "./context/CollapseContext";
 import { ReviewProvider, useReview } from "./context/ReviewContext";
 import {
@@ -35,6 +41,19 @@ import { useGlobalShortcuts } from "./shortcuts/useGlobalShortcuts";
 import { createLoadQueue, type LoadOutcome } from "./utils/loadQueue";
 import { commentsSignature, pageTitle } from "./utils/pageTitle";
 import { compareByTreeOrder } from "./utils/treeOrder";
+import {
+  ALL_FILES,
+  focusForPath,
+  focusKey,
+  focusPaths,
+  INTENT,
+  nextEntry,
+  progressOf,
+  readingOrder,
+  resolveWalkthrough,
+  sameFocus,
+  type WalkthroughFocus,
+} from "./utils/walkthrough";
 
 /** What was fetched for the launch mode: a patch, or a folder listing. */
 type ViewState =
@@ -120,10 +139,20 @@ function AppContent() {
   const [navigationTarget, setNavigationTarget] = useState<NavigationTarget | null>(null);
   // Phones start on the diff: the sidebar would cover it.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isNarrowScreen);
-  // Files on every load: the view is not persisted.
+  // Files on every load, or Walkthrough when the review has one: the view is
+  // not persisted.
   const [sidebarView, setSidebarView] = useState<SidebarView>("files");
-  const [fileQuery, setFileQuery] = useState("");
-  const [commentQuery, setCommentQuery] = useState("");
+  // Each view keeps its own search.
+  const [queries, setQueries] = useState<Record<SidebarView, string>>({
+    files: "",
+    comments: "",
+    walkthrough: "",
+  });
+  // Outlives sidebar view switches: it belongs to the walkthrough, not the view.
+  const [walkthroughFocus, setWalkthroughFocus] = useState<WalkthroughFocus>(INTENT);
+  // The diff follows the walkthrough from the Walkthrough view and shows every
+  // file from the Files view; Comments keeps whichever was last.
+  const [followWalkthrough, setFollowWalkthrough] = useState(false);
   const [currentCommentId, setCurrentCommentId] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -165,6 +194,28 @@ function AppContent() {
         }));
   }, [view, fileDiffs]);
 
+  const filePaths = useMemo(() => files.map((f) => f.name), [files]);
+
+  // Checked against the diff: steps hold only its files. None in folder mode.
+  const isDiff = view?.kind === "diff";
+  const walkthrough = useMemo(
+    () => (state.walkthrough && isDiff ? resolveWalkthrough(state.walkthrough, filePaths) : null),
+    [state.walkthrough, isDiff, filePaths],
+  );
+  // A focus the diff no longer has (a reload emptied its step) falls back to
+  // the intent.
+  const focus = useMemo(() => {
+    if (!walkthrough || !followWalkthrough) return ALL_FILES;
+    return focusPaths(walkthrough, walkthroughFocus) ? walkthroughFocus : INTENT;
+  }, [walkthrough, followWalkthrough, walkthroughFocus]);
+  const focusedPaths = useMemo(() => focusPaths(walkthrough, focus), [walkthrough, focus]);
+  // The comment list reads in the diff's order: the walkthrough's while one is
+  // in use, so `n` moves forward through the steps.
+  const commentOrder = useMemo(
+    () => (walkthrough && focus.kind !== "all" ? readingOrder(walkthrough) : null),
+    [walkthrough, focus.kind],
+  );
+
   const commentSource = useMemo<CommentIndexSource>(
     () =>
       view?.kind === "folder"
@@ -172,7 +223,7 @@ function AppContent() {
         : { kind: "diff", fileDiffs: new Map(fileDiffs.map((f) => [f.name, f])) },
     [view, fileDiffs, folderFiles],
   );
-  const comments = useCommentIndex(state.files, commentSource, commentQuery);
+  const comments = useCommentIndex(state.files, commentSource, queries.comments, commentOrder);
 
   const reviewedCount = useMemo(
     () => Object.values(state.files).filter((f) => f.viewed).length,
@@ -223,6 +274,10 @@ function AppContent() {
       const initialStaged = launch.type === "pending" && launch.staged;
       setStaged(initialStaged);
       setSession({ launch, repo, reviewLoaded: savedReview !== null });
+      if (savedReview?.walkthrough && launch.type !== "folder") {
+        setSidebarView("walkthrough");
+        setFollowWalkthrough(true);
+      }
       if (savedReview) setExportedComments(commentsSignature(savedReview.files));
       await loadView(launch, initialStaged);
     } catch (err) {
@@ -282,6 +337,7 @@ function AppContent() {
               ? { ...state.source, staged }
               : state.source
             : viewSource(session.launch, staged),
+        ...(state.walkthrough && { walkthrough: state.walkthrough }),
         files: Object.values(state.files),
       };
       const result = await submitReview(reviewState);
@@ -297,8 +353,6 @@ function AppContent() {
     }
   }, [state, session, staged]);
 
-  const filePaths = useMemo(() => files.map((f) => f.name), [files]);
-
   const viewerContent = useMemo<ViewerContent>(
     () =>
       view?.kind === "folder"
@@ -312,14 +366,73 @@ function AppContent() {
     if (isNarrowScreen()) setSidebarCollapsed(true);
   }, []);
 
+  /** Every navigation into the diff goes through here: a file outside the
+   *  focused entry first switches the focus to the entry holding it. */
+  const focusFile = useCallback(
+    (filePath: string) => {
+      const next = focusForPath(walkthrough, focus, filePath);
+      if (!sameFocus(next, focus)) setWalkthroughFocus(next);
+    },
+    [walkthrough, focus],
+  );
+
   const handleSelectFile = useCallback(
     (filePath: string) => {
+      focusFile(filePath);
       setSelectedFile(filePath);
       setNavigationTarget({ file: filePath });
       revealDiff();
     },
-    [revealDiff],
+    [revealDiff, focusFile],
   );
+
+  const handleSelectFocus = useCallback(
+    (next: WalkthroughFocus) => {
+      setWalkthroughFocus(next);
+      setFollowWalkthrough(true);
+      // The tree's selection follows into the entry's files.
+      const paths = focusPaths(walkthrough, next);
+      if (paths?.length) {
+        setSelectedFile((current) => (current && paths.includes(current) ? current : paths[0]));
+      }
+      revealDiff();
+    },
+    [walkthrough, revealDiff],
+  );
+
+  const handleViewChange = useCallback((next: SidebarView) => {
+    setSidebarView(next);
+    if (next !== "comments") setFollowWalkthrough(next === "walkthrough");
+  }, []);
+
+  const stepProgress =
+    focusedPaths && (focus.kind === "step" || focus.kind === "other")
+      ? progressOf(focusedPaths, state.files)
+      : null;
+  const setStepViewed = useCallback(
+    (viewed: boolean) => {
+      if (focusedPaths) dispatch({ type: "SET_VIEWED", paths: [...focusedPaths], viewed });
+    },
+    [focusedPaths, dispatch],
+  );
+
+  const diffFocus = useMemo<DiffFocus | null>(() => {
+    if (!walkthrough || !focusedPaths) return null;
+    return {
+      key: focusKey(focus),
+      paths: focusedPaths,
+      roles: walkthrough.roles,
+      header: (
+        <WalkthroughHeader
+          walkthrough={walkthrough}
+          focus={focus}
+          paths={focusedPaths}
+          onSelectFocus={handleSelectFocus}
+          onSelectFile={handleSelectFile}
+        />
+      ),
+    };
+  }, [walkthrough, focus, focusedPaths, handleSelectFocus, handleSelectFile]);
 
   const handleNavigationHandled = useCallback((target: NavigationTarget) => {
     setNavigationTarget((current) => (current === target ? null : current));
@@ -330,6 +443,7 @@ function AppContent() {
   const navigateToComment = useCallback(
     (entry: IndexedComment, openDrawer: boolean) => {
       const { comment, kind } = entry;
+      focusFile(comment.filePath);
       revealDiff();
       setCurrentCommentId(comment.id);
       setSelectedFile(comment.filePath);
@@ -342,7 +456,7 @@ function AppContent() {
           : { file: comment.filePath, openDrawer, fileComment: true },
       );
     },
-    [revealDiff],
+    [revealDiff, focusFile],
   );
 
   const handleSelectComment = useCallback(
@@ -351,7 +465,7 @@ function AppContent() {
   );
 
   const handleQueryChange = useCallback(
-    (query: string) => (sidebarView === "files" ? setFileQuery(query) : setCommentQuery(query)),
+    (query: string) => setQueries((q) => ({ ...q, [sidebarView]: query })),
     [sidebarView],
   );
 
@@ -440,10 +554,11 @@ function AppContent() {
           <div className="flex flex-col h-full">
             <SidebarHeader
               view={sidebarView}
-              onViewChange={setSidebarView}
-              query={sidebarView === "files" ? fileQuery : commentQuery}
+              onViewChange={handleViewChange}
+              query={queries[sidebarView]}
               onQueryChange={handleQueryChange}
               commentCount={comments.all.length}
+              hasWalkthrough={walkthrough !== null}
               inputRef={searchInputRef}
             />
             {/* Both views stay mounted, so each keeps its scroll and the tree
@@ -456,7 +571,7 @@ function AppContent() {
                 reviewFiles={state.files}
                 selectedFile={selectedFile}
                 onSelectFile={handleSelectFile}
-                search={fileQuery}
+                search={queries.files}
               />
             </div>
             <div
@@ -465,7 +580,7 @@ function AppContent() {
               <CommentsList
                 comments={comments.visible}
                 total={comments.all.length}
-                query={commentQuery}
+                query={queries.comments}
                 source={state.source}
                 currentCommentId={currentCommentId}
                 hidden={sidebarView !== "comments"}
@@ -473,6 +588,19 @@ function AppContent() {
                 onSelectFile={handleSelectFile}
               />
             </div>
+            {walkthrough ? (
+              <div
+                className={`flex-1 min-h-0 flex-col ${sidebarView === "walkthrough" ? "flex" : "hidden"}`}
+              >
+                <WalkthroughList
+                  walkthrough={walkthrough}
+                  focus={focus}
+                  reviewFiles={state.files}
+                  query={queries.walkthrough}
+                  onSelect={handleSelectFocus}
+                />
+              </div>
+            ) : null}
             <SidebarFooter
               skipped={view.kind === "folder" ? view.skipped : undefined}
               view={sidebarView}
@@ -482,18 +610,33 @@ function AppContent() {
           </div>
         }
       >
-        <ErrorBoundary>
-          <DiffViewer
-            content={viewerContent}
-            diffKey={view.kind === "diff" ? `${staged}:${view.branch}` : "folder"}
-            navigationTarget={navigationTarget}
-            reviewFiles={state.files}
-            onNavigationHandled={handleNavigationHandled}
-            onAddComment={addComment}
-            onDeleteComment={deleteComment}
-            onUpdateComment={updateComment}
-          />
-        </ErrorBoundary>
+        <div className="flex flex-col h-full">
+          <div className="flex-1 min-h-0">
+            <ErrorBoundary>
+              <DiffViewer
+                content={viewerContent}
+                diffKey={view.kind === "diff" ? `${staged}:${view.branch}` : "folder"}
+                navigationTarget={navigationTarget}
+                focus={diffFocus}
+                reviewFiles={state.files}
+                onNavigationHandled={handleNavigationHandled}
+                onAddComment={addComment}
+                onDeleteComment={deleteComment}
+                onUpdateComment={updateComment}
+              />
+            </ErrorBoundary>
+          </div>
+          {walkthrough && focus.kind !== "all" ? (
+            <WalkthroughBar
+              walkthrough={walkthrough}
+              focus={focus}
+              progress={stepProgress}
+              next={nextEntry(walkthrough, focus)}
+              onSetViewed={setStepViewed}
+              onNext={handleSelectFocus}
+            />
+          ) : null}
+        </div>
       </Layout>
       <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
     </CollapseProvider>

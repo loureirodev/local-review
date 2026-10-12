@@ -15,6 +15,9 @@
     <source type="agent">      optional: agent (name of the reviewing agent)
   Every type except folder also takes optional head (branch reviewed) and
   commit (SHA of HEAD), which the skill checks before open/apply.
+
+  <walkthrough> is optional and sits between <source> and <files>. Its
+  <file> elements are self-closing and unrelated to the review's <file>s.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
@@ -24,9 +27,10 @@
 
   <xs:complexType name="ReviewType">
     <xs:sequence>
-      <xs:element name="timestamp" type="xs:string"/>
-      <xs:element name="source"    type="SourceType"/>
-      <xs:element name="files"     type="FilesType"/>
+      <xs:element name="timestamp"   type="xs:string"/>
+      <xs:element name="source"      type="SourceType"/>
+      <xs:element name="walkthrough" type="WalkthroughType" minOccurs="0"/>
+      <xs:element name="files"       type="FilesType"/>
     </xs:sequence>
   </xs:complexType>
 
@@ -77,6 +81,51 @@
         </xs:restriction>
       </xs:simpleType>
     </xs:attribute>
+  </xs:complexType>
+
+  <!-- ===== Walkthrough ===== -->
+  <!--
+    Reading order for the change. <intent>, <risk> and <verify> hold markdown,
+    escaped like a comment <body>. Step order is reading order.
+  -->
+  <xs:complexType name="WalkthroughType">
+    <xs:sequence>
+      <xs:element name="intent" type="xs:string"/>
+      <xs:element name="risk"   type="RiskType" minOccurs="0"/>
+      <xs:element name="step"   type="StepType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="RiskType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="reversible" type="xs:boolean" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="StepType">
+    <xs:sequence>
+      <xs:element name="verify" type="xs:string" minOccurs="0"/>
+      <xs:element name="file"   type="WalkthroughFileType" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="title" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:minLength value="1"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+  <!--
+    path — repo-relative, the new path for renames. A path belongs to at most
+           one step; later occurrences are ignored.
+    role — optional plain text: the file's part in the change, one line.
+  -->
+  <xs:complexType name="WalkthroughFileType">
+    <xs:attribute name="path" type="xs:string" use="required"/>
+    <xs:attribute name="role" type="xs:string"/>
   </xs:complexType>
 
   <!-- ===== Files container ===== -->

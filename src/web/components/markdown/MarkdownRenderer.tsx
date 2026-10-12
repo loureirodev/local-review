@@ -1,9 +1,10 @@
 // Loaded on demand through `Markdown` or the preview, so react-markdown and its
 // unified pipeline stay out of the initial bundle.
 
-import { type AnchorHTMLAttributes, memo } from "react";
+import { type AnchorHTMLAttributes, type HTMLAttributes, memo } from "react";
 import ReactMarkdown, { type Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import MermaidBlock from "./MermaidBlock";
 
 const REMARK_PLUGINS = [remarkGfm];
 
@@ -15,7 +16,24 @@ function ExternalLink({
   return <a {...props} target="_blank" rel="noopener noreferrer" />;
 }
 
-const BASE_COMPONENTS: Components = { a: ExternalLink };
+/** ```mermaid blocks render as diagrams; every other code renders as before. */
+function Code({
+  node: _node,
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLElement> & { node?: unknown }) {
+  if (className?.split(" ").includes("language-mermaid") && typeof children === "string") {
+    return <MermaidBlock source={children.replace(/\n$/, "")} />;
+  }
+  return (
+    <code {...props} className={className}>
+      {children}
+    </code>
+  );
+}
+
+const BASE_COMPONENTS: Components = { a: ExternalLink, code: Code };
 
 export interface MarkdownRendererProps {
   children: string;

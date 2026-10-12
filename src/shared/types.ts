@@ -48,9 +48,33 @@ export interface FileReviewState {
   comments: ReviewComment[];
 }
 
+export interface WalkthroughFile {
+  /** Repository-relative; the new path for renames. */
+  path: string;
+  /** One line on the file's part in the change. */
+  role?: string;
+}
+
+export interface WalkthroughStep {
+  title: string;
+  /** Markdown: what to verify in this step, not what changed. */
+  verify?: string;
+  files: WalkthroughFile[];
+}
+
+/** Reading order for a change, written by the skill. Read-only in the UI:
+ *  saves write it back unchanged. */
+export interface ReviewWalkthrough {
+  /** Markdown: why the change exists and its overall shape. */
+  intent: string;
+  risk?: { reversible: boolean; body: string };
+  steps: WalkthroughStep[];
+}
+
 export interface ReviewState {
   timestamp: string;
   source: DiffSource;
+  walkthrough?: ReviewWalkthrough;
   files: FileReviewState[];
 }
 
@@ -83,10 +107,6 @@ export const FOLDER_FILE_MAX_MB = 1;
 export interface FolderTreeResponse {
   paths: string[];
   skipped: { binary: number; oversized: number };
-}
-
-export interface ApiError {
-  error: string;
 }
 
 /** `sessionTheme` stays out of band: `--theme` must not arrive as `settings.theme`,

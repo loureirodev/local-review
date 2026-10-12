@@ -76,8 +76,6 @@ after being imported from a forge (GitHub/GitLab). The body reflects the user's
 revised intent — always use the body as-is, which already contains the edited
 version.
 
-**IMPORTANT**: Do NOT run `git add` or `git commit`. Only modify the working tree.
-
 ## Step 4 — Handle errors without aborting
 
 If applying a specific comment fails (file not found, line out of range, search text missing):
@@ -106,5 +104,3 @@ Failed:
 
 Changes are unstaged. Review with: git diff
 ```
-
-No commits or staging is performed automatically.
