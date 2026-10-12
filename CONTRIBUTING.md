@@ -137,4 +137,8 @@ Publishing is automated via GitHub Actions. When a version tag is pushed, the CI
    ```
 3. GitHub Actions handles the rest (CI → dual publish → GitHub Release)
 
+### Prereleases
+
+A version with a prerelease suffix (`1.0.0-beta.1`, `1.0.0-rc.1`) is published under the npm dist-tag named by its identifier (`beta`, `rc`) instead of `latest`, and its GitHub Release is marked as a pre-release. Users install it with `npm i @loureirodev/local-review@beta`.
+
 **Tip:** Run `npm publish --dry-run` locally to verify package contents before tagging.

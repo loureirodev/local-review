@@ -42,7 +42,19 @@ jobs:
           node-version: 24
           registry-url: https://npm.pkg.github.com
 
-      - run: npm publish
+      - name: Resolve npm dist-tag
+        id: dist
+        run: |
+          VERSION="$(jq -r .version package.json)"
+          if [[ "$VERSION" == *-* ]]; then
+            # 1.0.0-beta.1 -> beta
+            PRE="${VERSION#*-}"
+            echo "tag=${PRE%%.*}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm publish --tag ${{ steps.dist.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -73,7 +85,19 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - run: npm publish --access public --provenance
+      - name: Resolve npm dist-tag
+        id: dist
+        run: |
+          VERSION="$(jq -r .version package.json)"
+          if [[ "$VERSION" == *-* ]]; then
+            # 1.0.0-beta.1 -> beta
+            PRE="${VERSION#*-}"
+            echo "tag=${PRE%%.*}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm publish --access public --provenance --tag ${{ steps.dist.outputs.tag }}
 
   github-release:
     name: GitHub Release
@@ -86,3 +110,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
