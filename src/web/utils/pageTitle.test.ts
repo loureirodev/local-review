@@ -27,6 +27,17 @@ describe("pageTitle", () => {
     );
     expect(pageTitle({ type: "folder", path: "/x/notes" }, undefined, "", false)).toBe("notes");
   });
+
+  test("folder: Windows path", () => {
+    expect(
+      pageTitle(
+        { type: "folder", path: "C:\\work\\local-review\\docs\\" },
+        "local-review",
+        "",
+        false,
+      ),
+    ).toBe("docs · local-review");
+  });
 });
 
 describe("pageTitle unsaved mark", () => {

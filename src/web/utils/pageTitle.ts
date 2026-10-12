@@ -12,7 +12,7 @@ export function pageTitle(
 ): string {
   const prefix = unsaved ? "• " : "";
   if (launch.type === "folder") {
-    const folder = launch.path.split("/").filter(Boolean).at(-1) ?? launch.path;
+    const folder = launch.path.split(/[\\/]/).filter(Boolean).at(-1) ?? launch.path;
     return prefix + (repo && repo !== folder ? `${folder}${SEPARATOR}${repo}` : folder);
   }
   const head = launch.type === "branch" ? `${branch} → ${launch.base}` : branch;
