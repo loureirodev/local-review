@@ -4,8 +4,8 @@
 import type { DiffSource, LaunchSource } from "../shared/types";
 import type { Checkout } from "./git";
 
-export type CheckStatus = "ok" | "branch-mismatch" | "folder-missing" | "no-review";
-export type CheckWarning = "commit-mismatch" | "unverified";
+type CheckStatus = "ok" | "branch-mismatch" | "folder-missing" | "no-review";
+type CheckWarning = "commit-mismatch" | "unverified";
 
 export interface CheckResult {
   status: CheckStatus;

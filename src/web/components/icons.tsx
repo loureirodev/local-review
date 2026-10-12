@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 
 /** 24x24 at 20px is an effective 1.25px stroke, matching `openspec-ui`. */
-export const ICON_SIZE = 20;
+const ICON_SIZE = 20;
 
 /** For icons set inside 11px metadata lines, where 20px would tower over the
  *  text it labels. Same grid and stroke, smaller render. See DESIGN.md. */
@@ -212,10 +212,13 @@ export function ChevronRightIcon({ size, className }: IconProps) {
   );
 }
 
-export function CommentIcon({ size, className }: IconProps) {
+/** `written` adds two lines of text inside the bubble: the same shape, telling
+ *  "there are comments" from "there are none". */
+export function CommentIcon({ size, className, written }: IconProps & { written?: boolean }) {
   return (
     <Icon size={size} className={className}>
       <path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4V5z" />
+      {written ? <path d="M7.5 8h9M7.5 12h6" /> : null}
     </Icon>
   );
 }
@@ -385,9 +388,33 @@ export function AgentIcon({ size }: IconProps) {
   );
 }
 
-/* Brand marks: the exception to the drawing rules above. These are other
-   people's logotypes, so they keep their own fixed, filled geometry and only
-   share the render size. */
+/* Brand marks: the exception to the drawing rules above. Logotypes keep their
+   own fixed geometry and only share the render size. */
+
+/** Our own logotype: a house (local) holding a diff. The bars keep the brand
+ *  colours; only the outline follows the ink. */
+export function LogoMark({ size = ICON_SIZE }: IconProps) {
+  return (
+    <svg aria-hidden="true" width={size} height={size} viewBox="0 0 64 64" fill="none">
+      <path
+        d="M8.5 30 L28.8 12.4 Q32 9.6 35.2 12.4 L55.5 30 V45 Q55.5 55 45.5 55 H18.5 Q8.5 55 8.5 45 Z"
+        stroke="currentColor"
+        strokeWidth="4.4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <g className="fill-brand-remove">
+        <rect x="16.5" y="33.85" width="5" height="1.9" rx="0.95" />
+        <rect x="26" y="32.5" width="15" height="4.6" rx="2.3" />
+      </g>
+      <g className="fill-brand-add">
+        <rect x="16.5" y="44.25" width="5" height="1.9" rx="0.95" />
+        <rect x="18.05" y="42.7" width="1.9" height="5" rx="0.95" />
+        <rect x="26" y="42.9" width="19" height="4.6" rx="2.3" />
+      </g>
+    </svg>
+  );
+}
 
 export function GitHubIcon({ size = ICON_SIZE }: IconProps) {
   return (

@@ -29,9 +29,11 @@ import {
   HttpError,
   submitReview,
 } from "./hooks/api";
+import { isNarrowScreen } from "./hooks/useNarrowScreen";
 import { SettingsProvider } from "./hooks/useSettings";
 import { useGlobalShortcuts } from "./shortcuts/useGlobalShortcuts";
 import { createLoadQueue, type LoadOutcome } from "./utils/loadQueue";
+import { commentsSignature, pageTitle } from "./utils/pageTitle";
 import { compareByTreeOrder } from "./utils/treeOrder";
 
 /** What was fetched for the launch mode: a patch, or a folder listing. */
@@ -45,6 +47,7 @@ const EMPTY_FILE_DIFFS: FileDiffMetadata[] = [];
 /** Fixed once the app has loaded. */
 interface Session {
   launch: LaunchSource;
+  repo?: string;
   /** A saved review was loaded (`--existing`): its source is the one exported. */
   reviewLoaded: boolean;
 }
@@ -112,8 +115,11 @@ function AppContent() {
   // quickly must not leave an older response on screen.
   const loadIdRef = useRef(0);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  /** Comments as last loaded from or exported to review.xml. */
+  const [exportedComments, setExportedComments] = useState("");
   const [navigationTarget, setNavigationTarget] = useState<NavigationTarget | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Phones start on the diff: the sidebar would cover it.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isNarrowScreen);
   // Files on every load: the view is not persisted.
   const [sidebarView, setSidebarView] = useState<SidebarView>("files");
   const [fileQuery, setFileQuery] = useState("");
@@ -203,7 +209,10 @@ function AppContent() {
   const init = useCallback(async () => {
     dispatchAsync({ type: "LOAD_START" });
     try {
-      const [{ source: launch }, savedReview] = await Promise.all([fetchSession(), fetchReview()]);
+      const [{ source: launch, repo }, savedReview] = await Promise.all([
+        fetchSession(),
+        fetchReview(),
+      ]);
       dispatch(
         savedReview
           ? { type: "LOAD_REVIEW", reviewState: savedReview }
@@ -213,7 +222,8 @@ function AppContent() {
       // with --existing).
       const initialStaged = launch.type === "pending" && launch.staged;
       setStaged(initialStaged);
-      setSession({ launch, reviewLoaded: savedReview !== null });
+      setSession({ launch, repo, reviewLoaded: savedReview !== null });
+      if (savedReview) setExportedComments(commentsSignature(savedReview.files));
       await loadView(launch, initialStaged);
     } catch (err) {
       dispatchAsync({
@@ -240,6 +250,10 @@ function AppContent() {
     init();
   }, [init]);
 
+  const unsaved = useMemo(
+    () => commentsSignature(Object.values(state.files)) !== exportedComments,
+    [state.files, exportedComments],
+  );
   const handleStagedChange = useCallback(
     (nextStaged: boolean) => {
       setStaged(nextStaged);
@@ -271,6 +285,7 @@ function AppContent() {
         files: Object.values(state.files),
       };
       const result = await submitReview(reviewState);
+      setExportedComments(commentsSignature(reviewState.files));
       alert(`Review exported to: ${result.path}`);
     } catch (err) {
       dispatchAsync({
@@ -292,10 +307,19 @@ function AppContent() {
     [view, filePaths, folderFiles, handleLoadFile, fileDiffs],
   );
 
-  const handleSelectFile = useCallback((filePath: string) => {
-    setSelectedFile(filePath);
-    setNavigationTarget({ file: filePath });
+  // On phones the sidebar lies over the diff: going somewhere means reading it.
+  const revealDiff = useCallback(() => {
+    if (isNarrowScreen()) setSidebarCollapsed(true);
   }, []);
+
+  const handleSelectFile = useCallback(
+    (filePath: string) => {
+      setSelectedFile(filePath);
+      setNavigationTarget({ file: filePath });
+      revealDiff();
+    },
+    [revealDiff],
+  );
 
   const handleNavigationHandled = useCallback((target: NavigationTarget) => {
     setNavigationTarget((current) => (current === target ? null : current));
@@ -303,19 +327,23 @@ function AppContent() {
 
   /** A click opens a file-level or orphaned comment in the file's drawer; `n`/`p`
    *  only scroll to the file, so stepping through never stops on a dialog. */
-  const navigateToComment = useCallback((entry: IndexedComment, openDrawer: boolean) => {
-    const { comment, kind } = entry;
-    setCurrentCommentId(comment.id);
-    setSelectedFile(comment.filePath);
-    setNavigationTarget(
-      kind === "line" && comment.line !== null
-        ? {
-            file: comment.filePath,
-            comment: { id: comment.id, line: comment.line, side: comment.side },
-          }
-        : { file: comment.filePath, openDrawer, fileComment: true },
-    );
-  }, []);
+  const navigateToComment = useCallback(
+    (entry: IndexedComment, openDrawer: boolean) => {
+      const { comment, kind } = entry;
+      revealDiff();
+      setCurrentCommentId(comment.id);
+      setSelectedFile(comment.filePath);
+      setNavigationTarget(
+        kind === "line" && comment.line !== null
+          ? {
+              file: comment.filePath,
+              comment: { id: comment.id, line: comment.line, side: comment.side },
+            }
+          : { file: comment.filePath, openDrawer, fileComment: true },
+      );
+    },
+    [revealDiff],
+  );
 
   const handleSelectComment = useCallback(
     (entry: IndexedComment) => navigateToComment(entry, true),
@@ -327,6 +355,7 @@ function AppContent() {
     [sidebarView],
   );
 
+  const collapseSidebar = useCallback(() => setSidebarCollapsed(true), []);
   const toggleSidebar = useCallback(() => setSidebarCollapsed((c) => !c), []);
 
   const openHelp = useCallback(() => setHelpOpen(true), []);
@@ -375,7 +404,7 @@ function AppContent() {
       <div className="flex items-center justify-center h-screen bg-bg">
         <div className="flex flex-col items-center gap-3">
           <div className="size-6 border-[1.5px] border-hair border-t-accent rounded-full animate-spin" />
-          <p className="text-xs text-muted">Loading diff...</p>
+          <p className="text-xs text-muted">Loading diff…</p>
         </div>
       </div>
     );
@@ -387,8 +416,13 @@ function AppContent() {
       reviewFiles={state.files}
       collapsedByDefault={session.launch.type === "folder"}
     >
+      {/* Rendered before index.html's <title>, which stands until the first load. */}
+      <title>
+        {pageTitle(session.launch, session.repo, view.kind === "diff" ? view.branch : "", unsaved)}
+      </title>
       <Layout
         sidebarCollapsed={sidebarCollapsed}
+        onCollapseSidebar={collapseSidebar}
         toolbar={
           <Toolbar
             source={viewSource(session.launch, staged)}
@@ -441,6 +475,8 @@ function AppContent() {
             </div>
             <SidebarFooter
               skipped={view.kind === "folder" ? view.skipped : undefined}
+              view={sidebarView}
+              commentCount={comments.all.length}
               onOpenHelp={openHelp}
             />
           </div>

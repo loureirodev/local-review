@@ -1,5 +1,5 @@
 import type { GitStatusEntry } from "@pierre/trees";
-import { FileTree as PierreFileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react";
+import { FileTree as PierreFileTree, useFileTree } from "@pierre/trees/react";
 import type { FileReviewState } from "@shared/types";
 import { useEffect, useMemo, useRef } from "react";
 
@@ -37,6 +37,10 @@ const TREE_STYLE_BASE = {
   "--trees-theme-list-hover-bg": "var(--color-track)",
   "--trees-selected-bg-override": "var(--color-accent-tint)",
   "--trees-selected-fg-override": "var(--color-text)",
+  "--trees-focus-ring-color-override": "var(--color-accent)",
+  "--trees-selected-focused-border-color-override": "var(--color-accent)",
+  "--trees-focus-ring-width-override": "var(--focus-ring-width)",
+  "--trees-focus-ring-offset-override": "calc(var(--focus-ring-width) * -1)",
   "--trees-status-untracked-override": "var(--color-success)",
   "--trees-status-added-override": "var(--color-success)",
   "--trees-status-deleted-override": "var(--color-danger)",
@@ -55,6 +59,21 @@ const UNSAFE_CSS = `
        follow the OS and ignore data-theme. Inheriting picks up :root's resolved
        scheme instead. */
     color-scheme: inherit;
+  }
+
+  /* The ring is a ::before created on focus: @starting-style gives the fade a
+     start colour. */
+  [data-item-focused="true"]::before,
+  :focus-visible::before {
+    transition: outline-color var(--default-transition-duration)
+      var(--default-transition-timing-function);
+  }
+
+  @starting-style {
+    [data-item-focused="true"]::before,
+    :focus-visible::before {
+      outline-color: transparent;
+    }
   }
 
   /* --trees-bg is transparent here (see TREE_STYLE_BASE), so the truncation
@@ -101,11 +120,27 @@ export default function FileTree({
 }: FileTreeProps) {
   const reviewFilesRef = useRef(reviewFiles);
   reviewFilesRef.current = reviewFiles;
+  // Read by the selection listener, which the tree keeps from the first render.
+  const filePathSet = useMemo(() => new Set(files.map((f) => f.name)), [files]);
+  const selectionRef = useRef({ selectedFile, onSelectFile, filePathSet });
+  selectionRef.current = { selectedFile, onSelectFile, filePathSet };
 
   const { model } = useFileTree({
     paths: files.map((f) => f.name),
     initialExpansion: "open",
+    density: "compact",
     unsafeCSS: UNSAFE_CSS,
+    // Tree selection → navigation. A real click selects a file that differs from
+    // the current selectedFile → navigate. Scroll-driven active tracking sets
+    // selectedFile AND focuses that same file, so its selection echo has
+    // path === selectedFile and is skipped — no scroll→navigate feedback loop.
+    onSelectionChange: (paths) => {
+      const { selectedFile, onSelectFile, filePathSet } = selectionRef.current;
+      const path = paths[0];
+      if (paths.length === 1 && path !== selectedFile && filePathSet.has(path)) {
+        onSelectFile(path);
+      }
+    },
     renderRowDecoration: ({ item }) => {
       if (item.kind !== "file") return null;
       const count = reviewFilesRef.current[item.path]?.comments.length ?? 0;
@@ -186,14 +221,6 @@ export default function FileTree({
     return () => observer.disconnect();
   }, [model]);
 
-  const filePathSet = useMemo(() => new Set(files.map((f) => f.name)), [files]);
-  const selectedPaths = useFileTreeSelection(model);
-  const prevSelectionRef = useRef<readonly string[]>([]);
-  // Fresh read of selectedFile for the navigation guard below (avoids a stale
-  // closure when scroll-driven active tracking updates it).
-  const selectedFileRef = useRef(selectedFile);
-  selectedFileRef.current = selectedFile;
-
   // Reflect selectedFile → tree highlight. Depends on selectedFile ONLY: it must
   // NOT run on raw selection changes from a user click (the click sets the
   // selection first and selectedFile lags by a render) or it would re-focus the
@@ -201,19 +228,6 @@ export default function FileTree({
   useEffect(() => {
     if (selectedFile) model.focusPath(selectedFile);
   }, [selectedFile, model]);
-
-  // Tree selection → navigation. A real click selects a file that differs from
-  // the current selectedFile → navigate. Scroll-driven active tracking sets
-  // selectedFile AND focuses that same file, so its selection echo has
-  // path === selectedFile and is skipped — no scroll→navigate feedback loop.
-  useEffect(() => {
-    if (selectedPaths === prevSelectionRef.current) return;
-    prevSelectionRef.current = selectedPaths;
-    const path = selectedPaths[0];
-    if (selectedPaths.length === 1 && path !== selectedFileRef.current && filePathSet.has(path)) {
-      onSelectFile(path);
-    }
-  }, [selectedPaths, onSelectFile, filePathSet]);
 
   useEffect(() => {
     model.setSearch(search || null);

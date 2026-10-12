@@ -192,7 +192,7 @@ const IMAGE_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export type FolderImageResult =
   | { path: string; type: string }

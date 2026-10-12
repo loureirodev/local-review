@@ -41,7 +41,8 @@ Tailwind prefixes them, so the token is `--color-muted` and the class is
 | `--color-warning` | `text-warning` | `oklch(56% 0.13 85)` | `oklch(80% 0.13 85)` | modified files, "(edited)" |
 | `--color-danger` | `text-danger` | `oklch(53% 0.19 25)` | `oklch(72% 0.16 25)` | removed lines, deleted files, errors, destructive hover |
 | `--color-renamed` | `text-renamed` | `oklch(50% 0.16 300)` | `oklch(74% 0.14 300)` | renamed files |
-| `--color-brand` | `text-brand` | `oklch(58% 0.12 255)` | *(same)* | the brand mark, and nothing else |
+| `--color-brand-remove` | `fill-brand-remove` | `#F0776F` | *(same)* | the logotype's removed bar, and nothing else |
+| `--color-brand-add` | `fill-brand-add` | `#3BC1C6` | *(same)* | the logotype's added bar, and nothing else |
 
 Neutrals are copied verbatim from `openspec-ui` — that is what makes the two
 apps read as the same paper. The hues are warm on purpose: `85`/`80` on the
@@ -69,21 +70,35 @@ still working as a fill on cream; dark ink on a 66–74% teal clears 5:1 in both
 themes. The one place the accent used to be *text* — the comment-count badge
 in the file tree — is now a filled badge for the same reason.
 
-### `--brand` is reserved
+### `--brand-*` is reserved
 
-`--brand` is **not a semantic role**. It is theme-invariant, it is reserved for
-the brand mark, and it **MUST NOT encode state** — a brand colour that also
-means something turns every future rebrand into a bug hunt.
+`--brand-remove` and `--brand-add` are **not semantic roles**. They are
+theme-invariant, reserved for the brand mark, and **MUST NOT encode state**:
+a brand colour that also means something turns every future rebrand into a bug hunt.
 
-There is no logotype yet. The value above is provisional, chosen only for
-separation: it sits in the widest gap in the hue circle (`205`→`300`, midpoint
-`~255`) and well away from `openspec-ui`'s terracotta, because the brands are
-meant to differ even though the paper does not. It moved from 200 when the
-accent moved to 205 — a brand mark the same colour as every button is not a
-mark. Adopting a real logotype is a
-change to that **one line** and this one paragraph.
+The logotype is a house (*local*) holding a diff: a coral removed line over a
+teal added line, set in the ink. The two bar colours are the brand. They sit
+close to `--danger` (hue 25) and to the dark `--accent` (≈ hue 200) on purpose,
+since the mark *is* a diff, but they are separate tokens: retuning a state
+colour must never repaint the logo, and recolouring the logo must never change
+what a state means. What makes it a mark rather than another button is the
+house outline in ink, not the colours. The source files are
+`.references/local-review.svg` (outline) and `local-review-solid.svg` (filled).
 
-Because Tailwind drops `@theme` variables nothing references, `--color-brand` is
+Where it appears:
+
+- **Toolbar, far left:** `LogoMark` at 26px, outline variant, ink
+  outline, followed by the wordmark `local-review` (Lexend `text-sm` semibold,
+  tight tracking, ink; `review` in `text-accent`) from the `md` breakpoint up. Below `md` the mark stands
+  alone and the name is `sr-only`.
+- **Favicon:** `src/web/public/favicon.svg`, solid variant (a filled house
+  survives 16px; a 4.4/64 outline does not). `currentColor` means nothing in a
+  favicon, so the ink is a literal that flips under `prefers-color-scheme`.
+
+A static file cannot import a component, so the favicon repeats `LogoMark`'s
+geometry and the brand hex values. **A change to the mark is a change to both.**
+
+Because Tailwind drops `@theme` variables nothing references, `--color-brand-*` is
 declared in a `@theme static` block. A reserved token that vanishes from the
 build is not reserved.
 
@@ -205,13 +220,60 @@ not here, the shape is added here, with its row in this table.
 | `<Button variant="success">` | same shape, `bg-success/18` on `text-success` | the on-state of a toggle that records completion — a file marked viewed |
 | `<IconButton>` | `size-8` square (`compact` → `size-6`), `rounded-md`, `text-muted` → `hover:text-text hover:bg-track` | a button whose whole content is one icon |
 | `<IconButton filled>` | same square, with the neutral `bg-track` → `hover:bg-hair` fill at rest | an icon button that must be findable without hovering — adding a comment, in the file header and in the gutter |
-| `<SegmentedControl>` | a `bg-track` well; each option `px-2.5 py-1 text-xs font-medium`, the selected one lifted to `bg-bg` | exactly one of a few options — the diff mode, the diff layout |
+| `<SegmentedControl>` | a `bg-track` well; each option `px-2.5 py-1 text-xs font-medium`, the selected one lifted to `bg-bg` by a sliding pill, a fainter `--hair` pill following the pointer | exactly one of a few options: the diff mode, the diff layout |
 | `<ToggleRow>` | a full-width settings row that is the button, with a `.toggle-switch` on the right | an on/off setting in the popover |
-| `<LinkButton>` | text only, `text-muted` → `hover:text-text`, no shape | an action set inside a line of metadata that already has a shape — "Collapse all" in the sidebar footer |
+| `<LinkButton>` | text only, `text-muted` → `hover:text-text`, no shape; `px-1 py-0.5` cancelled by an equal negative margin, so the inset focus ring has room around the text without moving it | an action set inside a line of metadata that already has a shape, such as "Collapse all" in the sidebar footer |
 | `<RowButton>` | full width, left-aligned, `hover:bg-track`; display, padding and border from the call site | a list row that is itself the button — a comment card and a file group header in the Comments view |
 
 A `SegmentedControl` option whose label is only an icon passes a `title`, which
 is also its accessible name — the Files/Comments switch.
+
+`SegmentedControl` is native radios under labels, so the group is one tab stop
+and the arrow keys move the selection with no key handling of our own. Its two
+pills are the well's `::before`/`::after`, placed with CSS anchor positioning
+(`.segmented` in `index.css`): the selected pill anchors to the checked option,
+the hover pill to the hovered one and, with no pointer over the group, rests
+hidden under the selected one so it enters from there. No measuring, so an
+option whose width changes (the comment count) carries its pill with it. Where
+anchor positioning or `anchor-scope` is missing, the checked label keeps its own
+`bg-bg` and nothing slides.
+
+The pill's corner is the well's `rounded-md` minus the well's `p-0.5`
+(`--segmented-pill-radius`), so the two curves stay concentric; and options
+stretch to the well's full height, so an icon-only option's pill is as tall as
+its text neighbour's. The `.toggle-switch` knob is centred the same way: track,
+padding, knob and travel all come from the spacing scale.
+
+Its focus ring (see [Focus](#focus)) is drawn as an inset `box-shadow` on the
+selected pill, so it slides with it (a radio's focus is its selection), or as
+the usual outline on the label in the fallback. It is a ring, not a shadow, and
+is not one of the shadow exceptions.
+
+## Focus
+
+One keyboard focus ring for the whole app: **2px of `--accent`, drawn inside
+the element** (`outline-offset` of minus its width). Inside, because the
+controls sit in tight containers (a segmented well with 2px of padding, a
+toolbar row, a tree row) and an outer ring covers the edge of whatever holds
+them.
+
+- `:focus-visible` in `index.css`'s base layer is the only rule; the width is
+  `--focus-ring-width`. A component does not style its own focus.
+- It **fades in** from a transparent accent, on Tailwind's default colour
+  transition (150ms, `cubic-bezier(0.4, 0, 0.2, 1)`), the one every
+  `transition-colors` control already runs on `outline-color`, so the global
+  rule, the tree and the segmented pill all match it. The resting
+  `outline-color` is transparent everywhere; left as `currentColor`, the ring
+  flashed the text colour (near-white in dark, ink in light) before turning
+  teal. The segmented ring also slides, because its pill does.
+- Text fields have no focus border of their own: the ring, drawn inside, covers
+  their 1px `--hair` border. An invalid field turns the ring `--danger`.
+- The file tree is in a shadow root, so it gets the same ring through its hooks:
+  `--trees-focus-ring-{color,width,offset}-override` and
+  `--trees-selected-focused-border-color-override`, all pointed at the token.
+  Left alone it draws its own blue at 1px.
+- The comment card's `--accent` border while writing is not a focus ring: it
+  marks the card being edited, and stays at the card's 1px.
 
 `IconButton` takes `active` for a trigger whose surface is open (it reads held
 down, not merely hovered) and `tone="danger"` for a destructive hover — the only
@@ -268,8 +330,9 @@ sizes to what it sits beside*, and there are exactly two answers.
 
 One exception, deliberate:
 
-- **Brand marks** (`GitHubIcon`, `GitLabIcon`) are other people's logotypes.
-  Fixed geometry, filled, their own grid. Only the render size is shared.
+- **Brand marks** (`GitHubIcon`, `GitLabIcon`, and our own `LogoMark`) are
+  logotypes. Fixed geometry, their own grid. Only the render size is shared;
+  `LogoMark` keeps its two brand bar colours, the one icon allowed a colour.
 
 ## What the font-size control moves
 
@@ -284,6 +347,8 @@ Two places enforce this:
 
 - the file tree pins `--trees-font-size-override` to **12px**, deliberately
   compact so more of a long path fits in the sidebar;
+- the file tree uses `density: "compact"` (24px rows instead of the 30px
+  default), so more files fit without scrolling;
 - `[data-diffs-header]` and `[data-separator]` pin their own `font-size`, because
   `--diffs-font-size` is set on `:host` and would otherwise be inherited by the
   chrome as well. Pinned on the leaves rather than by scoping the variable,
@@ -345,6 +410,18 @@ The viewed toggle animates its state change: the ring fills and the check
 scales in over 300ms rather than swapping. A toggle that records progress
 should feel like progress.
 
+The toolbar's review progress is the same state summed, so it speaks the same
+colour: a 16px ring whose arc fills in `--success` over a `--track` trough,
+followed by `viewed / total` (`viewed` in `--text`, the rest in `--muted`).
+It used to be a thin `--accent` bar, which said "clickable" about something
+that isn't and disagreed with the toggle it counts. When every file is viewed
+the check scales into the ring and the chip takes the toggle's `bg-success/18`
+wash; the text does not change, only its colour. The count's width is reserved
+for the total's digit count, because Lexend's digits are proportional and a
+changing width would slide the ring. The ring is a gauge, not an icon, so it
+draws at stroke 2 on its own 16px grid, with the check in the same SVG,
+centred on the grid rather than on `CheckIcon`'s 24px box.
+
 ## Markdown
 
 Comment bodies and the folder preview render as GFM (`react-markdown` +
@@ -376,6 +453,34 @@ because comment cards sit inside the preview and must not inherit its density.
   a block's comments render under it as the same cards the code view shows
   under a line.
 
+## Toolbar
+
+From `md` up the toolbar's first cell (mark, wordmark, sidebar toggle) is
+exactly as wide as the sidebar. Both use the `--spacing-sidebar` token
+(`w-sidebar`), never a literal width. Its right border continues the
+sidebar's. The mark sits at the left end, the toggle at the right, above the
+sidebar's edge. What is under review (branch → base, or the folder path, and
+the Unstaged/Staged switch) therefore starts where the diff starts. The cell
+keeps that width when the sidebar is collapsed: the toolbar does not move under
+the reviewer's cursor. The branch and the switch are one group, separated by
+space, not by a divider.
+
+Below `md` (phones):
+
+- The toolbar takes **two rows**. The first holds the mark, a divider, the
+  toggle, and the right zone; the second, under a hairline, holds what is under
+  review. Long branch names truncate.
+- Export collapses to its icon below `sm`; the label stays for screen readers.
+- The sidebar **overlays** the diff (capped at 85vw) instead of squeezing it,
+  starts collapsed, and closes when a file or a comment is picked, or on a tap
+  beside it. That tap lands on a scrim of the page ground (`bg-bg/60`), which
+  fades the diff toward the paper in either theme rather than darkening it.
+- The diff is always **unified**. Two code columns do not fit, so the split
+  preference is ignored there, not overwritten; the settings popover says so
+  instead of offering the switch. `DiffViewer` is the one place that decides
+  the layout in effect; `useNarrowScreen()` is the one JS reading of the `md`
+  breakpoint.
+
 ## Sidebar
 
 The sidebar has two views, **Files** (the tree) and **Comments** (the review's
@@ -383,12 +488,13 @@ comments), and one frame around them:
 
 - **Header** — a single row: the active view's search input (`flex-1`, with a
   `/` key cap at its right end while empty and unfocused) and a
-  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon` + the comment
-  count. Icons only, so the input keeps most of the width and the header does
-  not grow. Each view keeps its own query.
-- **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the file
-  count (and skipped count in folder mode), Collapse all · Expand all as
-  `LinkButton`s, and a compact `IconButton` with `HelpIcon` at the right end that
+  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon`, with the
+  comment count only in the option's `title`. The bubble is empty with no
+  comments and `written` (two lines of text inside) once there is one. Icons only, so the input keeps
+  most of the width and the header does not grow. Each view keeps its own query.
+- **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the
+  active view's count — files (and skipped, in folder mode) or comments —
+  then Collapse all · Expand all as `LinkButton`s, and a compact `IconButton` with `HelpIcon` at the right end that
   opens the shortcuts dialog. No collapsed count: it changed on every toggle and
   said nothing the diff doesn't show.
 
@@ -436,9 +542,13 @@ renders as `⌘` on macOS and `Ctrl` elsewhere.
 ## Motion
 
 Motion confirms, it does not decorate. 150–200ms, `ease-out` on the way in.
-Colour and opacity transition; layout does not, except the sidebar collapse and
-the drawer slide, which are the two places something genuinely moves. The
-navigation flash respects `prefers-reduced-motion`.
+Colour and opacity transition; layout does not, except the sidebar collapse, the
+drawer slide and the `SegmentedControl` pill, which are the places something
+genuinely moves. The pill slides because it shows where the selection came from
+and went: 280ms on `cubic-bezier(0.22, 1, 0.36, 1)`, a quint ease-out that
+settles without overshoot (an overshoot would poke out of the well), with the
+option's text colour on the same 280ms so it does not arrive before the pill.
+The navigation flash and the pill respect `prefers-reduced-motion`.
 
 ## Settings persistence
 
@@ -484,7 +594,7 @@ Every point where this system deliberately differs from `openspec-ui`:
 | CSS engine | plain CSS + CSS Modules | **Tailwind v4, tokens in `@theme`** | the family resemblance is in the values and roles, not the engine. Migrating ~2,500 lines to change nothing on screen is not worth it. |
 | display face | Fraunces | **none** | this app has no headings. Its largest text is a filename. |
 | accent | teal, hue 205 | **teal, hue 205** | the one value shared by choice rather than by inheritance; 205 keeps 95° clear of `--renamed`, which shares the file tree with it. |
-| brand | terracotta `#DD6E42` | **blue `oklch(58% 0.12 255)`**, provisional | the paper is shared, the mark is not. ~215° apart so the two tools are never mistaken for each other. |
+| brand | terracotta `#DD6E42` | **house logotype, coral `#F0776F` + teal `#3BC1C6` diff bars** | the paper is shared, the mark is not. The shape tells the two tools apart, not just the hue. |
 | filled surfaces | one only (the scenario block); no cards | **a documented floating-surface rule** | this app has four surfaces that genuinely float over arbitrary content. Pretending otherwise would mean four undocumented exceptions instead of one rule. |
 | shadows | exactly one (the tooltip) | **four, enumerated above** | same principle — a closed set with reasons, not an elevation scale. |
 | icon render size | 20px | **20px, plus 14px inline** | this app sets icons inside 11–12px metadata far more often. |
@@ -494,7 +604,7 @@ Every point where this system deliberately differs from `openspec-ui`:
 Everything not in that table is shared on purpose: the neutral ramp, the state
 hues, `--renamed`, the typography stacks, the icon drawing rules, the
 hairline-over-card preference, the theme resolution strategy, and the rule that
-`--brand` is reserved and never semantic.
+`--brand-*` is reserved and never semantic.
 
 ## Non-goals
 

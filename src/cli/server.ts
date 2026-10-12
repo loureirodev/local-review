@@ -17,7 +17,7 @@ import {
 } from "../shared/types";
 import { patchSettings, readSettings } from "./config";
 import { listFolder, readFolderFile, resolveFolderImage } from "./folder";
-import { getCheckout, getCurrentBranch, getGitDiff, getRepoRoot } from "./git";
+import { getCheckout, getGitDiff, getRepoName, getRepoRoot } from "./git";
 import { deserializeReview } from "./xml-deserializer";
 import { serializeReview } from "./xml-serializer";
 
@@ -60,7 +60,8 @@ async function handleApiRequest(req: Request, url: URL, opts: ServerOptions): Pr
 
   // GET /api/session — the launch mode, which decides what the UI fetches next
   if (pathname === "/api/session" && req.method === "GET") {
-    const body: SessionResponse = { source: opts.source };
+    const repoCwd = opts.source.type === "folder" ? opts.source.path : opts.cwd;
+    const body: SessionResponse = { source: opts.source, repo: await getRepoName(repoCwd) };
     return jsonResponse(body);
   }
 
@@ -75,9 +76,8 @@ async function handleApiRequest(req: Request, url: URL, opts: ServerOptions): Pr
         ? { type: "pending" as const, staged: url.searchParams.get("staged") === "true" }
         : { type: "branch" as const, base: launch.base };
     try {
-      const [patch, branch, checkout, repoRoot] = await Promise.all([
+      const [patch, checkout, repoRoot] = await Promise.all([
         getGitDiff(source, opts.extraArgs, opts.cwd),
-        getCurrentBranch(opts.cwd),
         getCheckout(opts.cwd),
         getRepoRoot(opts.cwd),
       ]);
@@ -85,7 +85,10 @@ async function handleApiRequest(req: Request, url: URL, opts: ServerOptions): Pr
       const response: DiffResponse = {
         patch,
         source: { ...source, head: checkout.branch, commit: checkout.commit },
-        info: { branch, repoRoot },
+        info: {
+          branch: checkout.branch ?? checkout.commit?.slice(0, 7) ?? "(no commits)",
+          repoRoot,
+        },
       };
       return jsonResponse(response);
     } catch (err) {

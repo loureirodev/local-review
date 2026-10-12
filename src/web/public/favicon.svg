@@ -1,0 +1,12 @@
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .ink { fill: #2f2a25; stroke: #2f2a25; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #efebe5; stroke: #efebe5; } }
+  </style>
+  <path class="ink" d="M8.5 30 L28.8 12.4 Q32 9.6 35.2 12.4 L55.5 30 V45 Q55.5 55 45.5 55 H18.5 Q8.5 55 8.5 45 Z" stroke-width="4.4" stroke-linejoin="round"/>
+  <rect x="16.5" y="33.85" width="5" height="1.9" rx="0.95" fill="#F0776F"/>
+  <rect x="26" y="32.5" width="15" height="4.6" rx="2.3" fill="#F0776F"/>
+  <rect x="16.5" y="44.25" width="5" height="1.9" rx="0.95" fill="#3BC1C6"/>
+  <rect x="18.05" y="42.7" width="1.9" height="5" rx="0.95" fill="#3BC1C6"/>
+  <rect x="26" y="42.9" width="19" height="4.6" rx="2.3" fill="#3BC1C6"/>
+</svg>

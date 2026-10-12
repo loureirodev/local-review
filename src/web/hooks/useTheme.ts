@@ -1,27 +1,13 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect } from "react";
+import { useMediaQuery } from "./useMediaQuery";
 import { useSettings } from "./useSettings";
 
 /** What the reviewer asked for. `"system"` defers to the environment. */
-export type ThemeOverride = "light" | "dark" | "system";
+type ThemeOverride = "light" | "dark" | "system";
 /** What actually gets painted, once the override and the environment are resolved. */
-export type ResolvedTheme = "light" | "dark";
+type ResolvedTheme = "light" | "dark";
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-
-function subscribeToSystemTheme(onChange: () => void): () => void {
-  const query = window.matchMedia(DARK_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function getSystemTheme(): ResolvedTheme {
-  return window.matchMedia(DARK_QUERY).matches ? "dark" : "light";
-}
-
-/** Matches the bare `:root` palette in index.css, which is the light one. */
-function getServerTheme(): ResolvedTheme {
-  return "light";
-}
 
 interface UseThemeResult {
   /** The theme in effect right now, as the shadow-DOM surfaces need it. */
@@ -50,7 +36,8 @@ export function useTheme(): UseThemeResult {
 
   // Live: an OS-level theme switch has to repaint while the app is open, and a
   // media query alone can't tell React about it.
-  const systemTheme = useSyncExternalStore(subscribeToSystemTheme, getSystemTheme, getServerTheme);
+  // Server value false: the bare `:root` palette in index.css is the light one.
+  const systemTheme: ResolvedTheme = useMediaQuery(DARK_QUERY) ? "dark" : "light";
 
   const theme: ResolvedTheme = override === "system" ? systemTheme : override;
 

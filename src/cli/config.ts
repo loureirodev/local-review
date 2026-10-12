@@ -18,7 +18,7 @@ type StoredSettings = Record<string, unknown>;
 
 /** `~/.config` even on macOS: an XDG-style path is what users of a terminal tool
  *  expect, and it is editable by hand. */
-export function getConfigPath(): string {
+function getConfigPath(): string {
   const xdg = process.env.XDG_CONFIG_HOME;
   if (xdg) return join(xdg, "local-review", "settings.json");
 

@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useMountEffect } from "../hooks/useMountEffect";
+import { useNarrowScreen } from "../hooks/useNarrowScreen";
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -31,8 +33,6 @@ interface SettingsPopoverProps {
   onFontSizeChange: (size: number) => void;
   onLineHeightChange: (height: number) => void;
 }
-
-/* ── Stepper Row ── */
 
 function StepperRow({
   icon,
@@ -83,7 +83,26 @@ function StepperRow({
   );
 }
 
-/* ── Main Popover ── */
+const DIFF_STYLE_OPTIONS = [
+  {
+    value: "split",
+    label: (
+      <>
+        <SplitIcon size={ICON_SIZE_INLINE} />
+        Split
+      </>
+    ),
+  },
+  {
+    value: "unified",
+    label: (
+      <>
+        <UnifiedIcon size={ICON_SIZE_INLINE} />
+        Unified
+      </>
+    ),
+  },
+] as const;
 
 export default function SettingsPopover({
   diffStyle,
@@ -98,36 +117,39 @@ export default function SettingsPopover({
   onLineHeightChange,
 }: SettingsPopoverProps) {
   const [open, setOpen] = useState(false);
+  const diffStyleLocked = useNarrowScreen();
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const openRef = useRef(open);
   openRef.current = open;
 
-  // Close on outside click — handler stored in ref so the effect registers once
-  const handleOutsideClickRef = useRef<((e: MouseEvent) => void) | null>(null);
-  handleOutsideClickRef.current = (e: MouseEvent) => {
-    if (
-      openRef.current &&
-      containerRef.current &&
-      !containerRef.current.contains(e.target as Node)
-    ) {
-      setOpen(false);
-    }
-  };
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (handleOutsideClickRef.current) {
-        handleOutsideClickRef.current(e);
-      }
+  // The handlers read only refs and the stable `setOpen`, so they register once.
+  useMountEffect(() => {
+    // Close on outside click.
+    const onMouseDown = (e: MouseEvent) => {
+      if (openRef.current && !containerRef.current?.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+    // Close on Escape. Focus returns to the trigger when it was inside the
+    // popover, which is about to go inert and would otherwise drop it on <body>.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !openRef.current) return;
+      e.preventDefault();
+      const hadFocus = containerRef.current?.contains(document.activeElement) ?? false;
+      setOpen(false);
+      if (hadFocus) triggerRef.current?.focus();
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  });
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Trigger */}
       <IconButton
+        ref={triggerRef}
         active={open}
         onClick={() => setOpen((v) => !v)}
         title="Display settings"
@@ -136,48 +158,33 @@ export default function SettingsPopover({
       >
         <SettingsIcon open={open} />
       </IconButton>
-      {/* Popover */}
+      {/* Kept mounted for the fade, so `inert` takes it out of the tab order
+          and the accessibility tree while closed. */}
       <div
+        inert={!open}
         className={`absolute top-full right-0 mt-1.5 w-56 bg-panel border border-hair rounded-lg shadow-float-lg z-50 overflow-hidden transition-all duration-200 origin-top-right ${
           open
             ? "opacity-100 scale-100 pointer-events-auto"
             : "opacity-0 scale-95 pointer-events-none"
         }`}
       >
-        {/* Header */}
         <div className="px-2.5 py-1.5 border-b border-hair text-[11px] font-medium text-muted uppercase tracking-wider">
           Display
         </div>
 
         <div className="p-1.5 space-y-0.5">
-          {/* Diff style — segmented control */}
           <div className="px-2.5 py-1.5">
             <div className="text-[11px] text-muted mb-1.5">Diff layout</div>
-            <SegmentedControl
-              aria-label="Diff layout"
-              value={diffStyle}
-              options={[
-                {
-                  value: "split",
-                  label: (
-                    <>
-                      <SplitIcon size={ICON_SIZE_INLINE} />
-                      Split
-                    </>
-                  ),
-                },
-                {
-                  value: "unified",
-                  label: (
-                    <>
-                      <UnifiedIcon size={ICON_SIZE_INLINE} />
-                      Unified
-                    </>
-                  ),
-                },
-              ]}
-              onChange={onDiffStyleChange}
-            />
+            {diffStyleLocked ? (
+              <div className="text-xs text-muted">Unified on small screens</div>
+            ) : (
+              <SegmentedControl
+                aria-label="Diff layout"
+                value={diffStyle}
+                options={DIFF_STYLE_OPTIONS}
+                onChange={onDiffStyleChange}
+              />
+            )}
           </div>
 
           <div className="mx-2 border-t border-hair" />
