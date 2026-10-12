@@ -22,7 +22,7 @@ With `--last-comment`, keep only the comment with the latest `createdAt`.
 
 Line resolution and the walkthrough read local files, so they must read the reviewed revision. Forge imports run [branch-check.md](branch-check.md) as it describes for an import. An agent review reviewed the current checkout: it always passes.
 
-Done when the checkout is on `head`, or the user chose to continue or cancel (cancel: stop, write nothing).
+Done when the checkout is on `head` at `commit`, or the user chose to continue or cancel (cancel: stop, write nothing).
 
 ## Step 4 — Resolve lines
 

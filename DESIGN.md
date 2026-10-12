@@ -514,8 +514,9 @@ frame around them:
 
 - **Header** — a single row: the active view's search input (`flex-1`, with a
   `/` key cap at its right end while empty and unfocused) and a
-  `SegmentedControl` of two icons, `FileIcon` and `CommentIcon`, with the
-  comment count only in the option's `title`. The bubble is empty with no
+  `SegmentedControl` of icons: `RouteIcon` first when the review has a
+  walkthrough (it is where the review opens), then `FileIcon` and
+  `CommentIcon`, with the comment count only in the option's `title`. The bubble is empty with no
   comments and `written` (two lines of text inside) once there is one. Icons only, so the input keeps
   most of the width and the header does not grow. Each view keeps its own query.
 - **Footer** — shared by both views, `bg-panel` over a `--hair` rule: the

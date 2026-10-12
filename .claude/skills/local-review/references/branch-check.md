@@ -13,6 +13,13 @@ expected branch, and `git rev-parse --abbrev-ref HEAD` the current one. Set
 has `head` checked out. Start at Step 3, and wherever a step says to run
 Step 1 again, compare the branches again instead.
 
+A matching branch name is not enough: a local branch can lag behind the
+forge. Once on `head`, compare `git rev-parse HEAD` with the source's `commit`.
+If they differ, relay the `commit-mismatch` warning (Step 2) and ask with the
+AskUserQuestion tool: **Update `<head>`** (`git pull --ff-only`, then compare
+again; on failure show the error and stop), **Continue at `<current commit>`**,
+or **Cancel**.
+
 ---
 
 ## Step 1 — Run the check

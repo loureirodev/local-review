@@ -8,7 +8,7 @@ Step 5 of [import.md](import.md). The schema is [../assets/review.xsd](../assets
 <?xml version="1.0" encoding="UTF-8"?>
 <review>
   <timestamp>2024-01-15T10:30:00Z</timestamp>
-  <source type="github-pr" owner="o" repo="r" pr="1" base="main" head="feat/x" commit="<40-hex sha>" />
+  <source type="github-pr" owner="o" repo="r" pr="1" base="main" head="feat/x" commit="3f2a9c1e8b7d6a5f4e3d2c1b0a9f8e7d6c5b4a39" />
   <!-- <walkthrough>, when present, goes here: see walkthrough.md -->
   <files>
     <file path="src/foo.ts" viewed="false">

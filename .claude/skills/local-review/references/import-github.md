@@ -16,12 +16,30 @@ Without `gh` but with `GITHUB_TOKEN`: the same three endpoints under `https://ap
 
 Neither: tell the user to install `gh` or export `GITHUB_TOKEN`, and stop.
 
+Resolved threads (skip with `--include-resolved`): REST does not say whether a thread is resolved, so list the ids of the comments in resolved threads through GraphQL:
+
+```bash
+gh api graphql --paginate -f owner=<owner> -f repo=<repo> -F pr=<pr> -f query='
+  query($owner: String!, $repo: String!, $pr: Int!, $endCursor: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $pr) {
+        reviewThreads(first: 100, after: $endCursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes { isResolved comments(first: 100) { nodes { databaseId } } }
+        }
+      }
+    }
+  }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved) | .comments.nodes[].databaseId'
+```
+
+Without `gh`: `POST https://api.github.com/graphql` with the same query as `{"query": …, "variables": {…}}`, same `Authorization` header, passing `pageInfo.endCursor` as `endCursor` while `hasNextPage`. Each `databaseId` is the `id` of an inline comment from REST.
+
 ## Filter
 
 Drop, and count as skipped:
 
 - **Bots**: login ending in `[bot]`, or `dependabot`, `renovate`, `codecov`, `sonarcloud`.
-- **Resolved threads**, unless `--include-resolved`.
+- **Resolved threads**: inline comments whose `id` is in the resolved list, unless `--include-resolved`.
 - **Acknowledgements**: replies like "fixed", "done", "will do" with no suggestion or substantive discussion.
 
 ## Map
